@@ -22,25 +22,6 @@ type Quotes record {
   string regulatoryInfo;
 };
 
-// public type aidpkg record {
-//     string package_id;
-//     string name;
-//     string description;
-//     aidpkg_status status;
-// };
-
-// public enum aidpkg_status {
-//     Unfunded,
-//     Partially\ Funded,
-//     Fully\ Funded,
-//     Awaiting\ Payment,
-//     Ordered,
-//     Shipped,
-//     Received\ MoH,
-//     Delivery\ InProgess,
-//     Delivered
-// }
-
 # A service representing a network-accessible API
 # bound to port `9090`.
 service /admin on new http:Listener(9090) {
