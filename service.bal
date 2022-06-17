@@ -8,7 +8,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for creating supplier
     # + return - supplierID
-    resource function post Suppliers(@http:Payload json supplier) returns int|error {
+    resource function post Suppliers(@http:Payload json supplier) returns http:BadRequest|int|error {
         Supplier _supplier = check supplier.fromJsonWithType();
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -70,7 +70,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for creating quote
     # + return - quoteID
-    resource function post Quotation(@http:Payload json quotation) returns int|error {
+    resource function post Quotation(@http:Payload json quotation) returns http:BadRequest|int|error {
         Quotation _quotation = check quotation.fromJsonWithType();
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -91,7 +91,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for creating aid-package;
     # + return - packageID
-    resource function post AidPackages(@http:Payload json aidPackage) returns int|error {
+    resource function post AidPackages(@http:Payload json aidPackage) returns http:BadRequest|int|error {
         AidPackage _aidPackage = check aidPackage.fromJsonWithType();
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -149,7 +149,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for creating aidPackage;
     # + return - packageID
-    resource function post AidPackage/[int packageID]/AidPackageItem(@http:Payload json aidPackageItem) returns int|error {
+    resource function post AidPackage/[int packageID]/AidPackageItem(@http:Payload json aidPackageItem) returns http:BadRequest|int|error {
         AidPackageItem _aidPackageItem = check aidPackageItem.fromJsonWithType();
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 

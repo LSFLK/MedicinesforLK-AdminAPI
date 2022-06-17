@@ -23,27 +23,6 @@ type Donor record {
   string phoneNumber;
 };
 
-// Enum
-enum NeedUrgency {
-  Normal,
-  Critical,
-  Urgent
-}
-enum AidPackageStatus {
-  Draft,
-  Published,
-  Awaiting\ Payment,
-  Ordered,
-  Shipped,
-  Received\ at\ MoH,
-  Delivered
-}
-enum PledgeStatus{
-  Pledged, 
-  Payment\ Initiated, 
-  Payment\ Confirmed
-}
-
 // Main Types
 type MedicalItem record {
   int itemID; 
@@ -61,8 +40,9 @@ type MedicalNeed record {
   int itemID;
   int beneficiaryID; 
   time:Date period;
-  NeedUrgency urgency;
+  string urgency;
   int quantity;
+  Beneficiary? beneficiary;
 };
 type Quotation record {
   int quotationID;
@@ -73,13 +53,15 @@ type Quotation record {
   string regulatoryInfo;
   string brandName;
   int unitPrice;
+  Supplier? supplier;
+  MedicalItem? medicalItem;
 };
 type AidPackage record {
   int packageID=-1;
   string description;
   string name;
-  AidPackageStatus status;
-  AidPackageItem[] aidPackageItems=[]; // OBJECTS
+  string status;
+  AidPackageItem?[] aidPackageItems=[];
 };
 type AidPackageItem record {
   int packageItemID=-1;
@@ -88,10 +70,11 @@ type AidPackageItem record {
   int needID;
   decimal quantity;
   int totalAmount;
+  Quotation? quotation;
 };
 type Pledge record {
   int packageID;
   int donorID; 
   decimal amount;
-  PledgeStatus status;
+  string status;
 };

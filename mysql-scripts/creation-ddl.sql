@@ -9,11 +9,10 @@ CREATE TABLE IF NOT EXISTS SUPPLIER (
 
 CREATE TABLE IF NOT EXISTS MEDICAL_ITEM (
              ITEMID INT NOT NULL AUTO_INCREMENT,
-             `TYPE` VARCHAR (255) NOT NULL,
+             `TYPE` ENUM('Device', 'Medicine'),
              NAME VARCHAR (255) NOT NULL,
              UNIT VARCHAR (50) NOT NULL,
-             PRIMARY KEY (ITEMID),
-             CONSTRAINT CHK_ITEM_TYPE CHECK (`TYPE` IN ('Device', 'Medicine'))
+             PRIMARY KEY (ITEMID)
 )ENGINE INNODB;
 
 CREATE TABLE IF NOT EXISTS BENEFICIARY (
@@ -39,10 +38,9 @@ CREATE TABLE IF NOT EXISTS MEDICAL_NEED (
              ITEMID INT NOT NULL,
              BENEFICIARYID INT NOT NULL,
              `PERIOD` TIMESTAMP NOT NULL,
-             URGENCY VARCHAR (50) NOT NULL,
+             URGENCY ENUM('Normal', 'Critical', 'Urgent'),
              PRIMARY KEY (NEEDID),
-             FOREIGN KEY (ITEMID) REFERENCES MEDICAL_ITEM(ITEMID),
-             CONSTRAINT CHK_NEED_URGENCY CHECK (`URGENCY` IN ('Normal', 'Critical', 'Urgent'))
+             FOREIGN KEY (ITEMID) REFERENCES MEDICAL_ITEM(ITEMID)
 )ENGINE INNODB;
 
 CREATE TABLE IF NOT EXISTS QUOTATION (
@@ -63,12 +61,10 @@ CREATE TABLE IF NOT EXISTS AID_PACKAGE (
              PACKAGEID INT NOT NULL AUTO_INCREMENT,
              NAME VARCHAR (20) NOT NULL,
              `DESCRIPTION` VARCHAR (1500) NOT NULL,
-             `STATUS` VARCHAR (20) NOT NULL,
-             PRIMARY KEY (PACKAGEID),
-             CONSTRAINT CHK_PACKAGE_STATUS CHECK (`STATUS` 
-             IN ('Draft', 'Published',
+             `STATUS` ENUM('Draft', 'Published',
              	 'Awaiting Payment', 'Ordered', 'Shipped',
-             	 'Received at MoH', 'Delivered'))
+             	 'Received at MoH', 'Delivered'),
+             PRIMARY KEY (PACKAGEID)
 )ENGINE INNODB;
 
 CREATE TABLE IF NOT EXISTS AID_PACKAGE_ITEM (
@@ -77,6 +73,7 @@ CREATE TABLE IF NOT EXISTS AID_PACKAGE_ITEM (
              NEEDID INT NOT NULL,
              PACKAGEID INT NOT NULL,
              QTY INT NOT NULL DEFAULT 0,
+             TOTALAMOUNT DECIMAL(15, 2) NOT NULL DEFAULT 0,
              PRIMARY KEY (PACKAGEITEMID),
              FOREIGN KEY (QUOTATIONID) REFERENCES QUOTATION(QUOTATIONID),
              FOREIGN KEY (NEEDID) REFERENCES MEDICAL_NEED(NEEDID), 
@@ -96,9 +93,7 @@ CREATE TABLE IF NOT EXISTS PLEDGE (
              PLEDGEID INT NOT NULL AUTO_INCREMENT,
              PACKAGEID INT NOT NULL,
              DONORID INT NOT NULL,
-             `STATUS` VARCHAR (20) NOT NULL,
-             CONSTRAINT CHK_PLEDGE_STATUS CHECK (`STATUS` 
-             IN ('Pledged', 'Payment Initiated', 'Payment Confirmed')),
+             `STATUS` ENUM('Pledged', 'Payment Initiated', 'Payment Confirmed'),
              PRIMARY KEY (PLEDGEID),
              FOREIGN KEY (PACKAGEID) REFERENCES AID_PACKAGE(PACKAGEID),
              FOREIGN KEY (DONORID) REFERENCES DONOR(DONORID)
