@@ -75,8 +75,8 @@ service /admin on new http:Listener(9090) {
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
         if dbClient is mysql:Client {
-            sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, NEEDID, BRANDNAME, AVAILABLEQTY, EXPIRYDATE, UNITPRICE, REGULATORYINFO)
-                                            VALUES (${_quotation.supplierID}, ${_quotation.needID}, ${_quotation.brandName}, ${_quotation.availableQuantity}
+            sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQTY, EXPIRYDATE, UNITPRICE, REGULATORYINFO)
+                                            VALUES (${_quotation.supplierID}, ${_quotation.itemID}, ${_quotation.brandName}, ${_quotation.availableQuantity}
                                                     ${_quotation.expiryDate}, ${_quotation.unitPrice}, ${_quotation.regulatoryInfo})`;
             sql:ExecutionResult result = check dbClient->execute(query);
             _quotation.quotationID = <int> result.lastInsertId;
@@ -144,7 +144,7 @@ service /admin on new http:Listener(9090) {
                 return aidPackage.toJson();
             }
         }
-        return aidPackage.toJson();
+        return aidPackage.toJson(); //OBJECTS
     }
 
     # A resource for creating aidPackage;
@@ -154,18 +154,16 @@ service /admin on new http:Listener(9090) {
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
         if dbClient is mysql:Client {
-            sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, QTY)
-                                            VALUES (${_aidPackageItem.quotationID}, ${packageID}, ${_aidPackageItem.quantity});`;
+            sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QTY)
+                                            VALUES (${_aidPackageItem.quotationID}, ${packageID}, ${_aidPackageItem.needID}, ${_aidPackageItem.quantity});`;
             sql:ExecutionResult result = check dbClient->execute(query);
-            if result.lastInsertId is () {
-                return -1;
-            }
+            _aidPackageItem.packageItemID = <int> result.lastInsertId;
 
             error? e = dbClient.close();
             if e is error {
-                return _aidPackageItem.quotationID;
+                return _aidPackageItem.packageItemID;
             }
         }
-        return _aidPackageItem.quotationID;
+        return _aidPackageItem.packageItemID;
     }
 }

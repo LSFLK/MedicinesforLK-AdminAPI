@@ -67,7 +67,7 @@ type MedicalNeed record {
 type Quotation record {
   int quotationID;
   int supplierID;
-  int needID;
+  int itemID;
   int availableQuantity;
   time:Date expiryDate; 
   string regulatoryInfo;
@@ -79,10 +79,13 @@ type AidPackage record {
   int description;
   int name;
   AidPackageStatus status;
+  AidPackageItem[] aidPackageItems=[]; // OBJECTS
 };
 type AidPackageItem record {
-  int packageID=-1;
+  int packageItemID=-1;
+  int packageID;
   int quotationID;
+  int needID;
   int quantity;
   int totalAmount;
 };
