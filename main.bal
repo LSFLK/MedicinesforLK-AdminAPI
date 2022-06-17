@@ -76,8 +76,8 @@ type Quotation record {
 };
 type AidPackage record {
   int packageID=-1;
-  int description;
-  int name;
+  string description;
+  string name;
   AidPackageStatus status;
   AidPackageItem[] aidPackageItems=[]; // OBJECTS
 };
@@ -86,12 +86,12 @@ type AidPackageItem record {
   int packageID;
   int quotationID;
   int needID;
-  int quantity;
+  decimal quantity;
   int totalAmount;
 };
 type Pledge record {
   int packageID;
   int donorID; 
-  int amount;
+  decimal amount;
   PledgeStatus status;
 };
