@@ -8,7 +8,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for creating supplier
     # + return - supplierID
-    resource function post Suppliers(@http:Payload json supplier) returns http:BadRequest|int|error {
+    resource function post Supplier(@http:Payload json supplier) returns int|error {
         Supplier _supplier = check supplier.fromJsonWithType();
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -16,7 +16,9 @@ service /admin on new http:Listener(9090) {
             sql:ParameterizedQuery query = `INSERT INTO SUPPLIER(NAME, SHORTNAME, EMAIL, PHONENUMBER)
                                             VALUES (${_supplier.name}, ${_supplier.shortName}, ${_supplier.email}, ${_supplier.phoneNumber});`;
             sql:ExecutionResult result = check dbClient->execute(query);
-            _supplier.supplierID = <int> result.lastInsertId;
+            if result.lastInsertId is int {
+                _supplier.supplierID = <int> result.lastInsertId;
+            }
 
             error? e = dbClient.close();
             if e is error {
@@ -68,18 +70,20 @@ service /admin on new http:Listener(9090) {
         return {};
     }
 
-    # A resource for creating quote
+    # A resource for creating quotation
     # + return - quoteID
-    resource function post Quotation(@http:Payload json quotation) returns http:BadRequest|int|error {
+    resource function post Quotation(@http:Payload json quotation) returns int|error {
         Quotation _quotation = check quotation.fromJsonWithType();
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
         if dbClient is mysql:Client {
             sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQTY, EXPIRYDATE, UNITPRICE, REGULATORYINFO)
-                                            VALUES (${_quotation.supplierID}, ${_quotation.itemID}, ${_quotation.brandName}, ${_quotation.availableQuantity}
-                                                    ${_quotation.expiryDate}, ${_quotation.unitPrice}, ${_quotation.regulatoryInfo})`;
+                                            VALUES (${_quotation.supplierID}, ${_quotation.itemID}, ${_quotation.brandName}, ${_quotation.availableQuantity},
+                                                    ${_quotation.expiryDate}, ${_quotation.unitPrice}, ${_quotation.regulatoryInfo});`;
             sql:ExecutionResult result = check dbClient->execute(query);
-            _quotation.quotationID = <int> result.lastInsertId;
+            if result.lastInsertId is int {
+                _quotation.quotationID = <int> result.lastInsertId;
+            }
 
             error? e = dbClient.close();
             if e is error {
@@ -89,9 +93,9 @@ service /admin on new http:Listener(9090) {
         return _quotation.quotationID;
     }
 
-    # A resource for creating aid-package;
+    # A resource for creating aid-package
     # + return - packageID
-    resource function post AidPackages(@http:Payload json aidPackage) returns http:BadRequest|int|error {
+    resource function post AidPackage(@http:Payload json aidPackage) returns int|error {
         AidPackage _aidPackage = check aidPackage.fromJsonWithType();
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -99,7 +103,35 @@ service /admin on new http:Listener(9090) {
             sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS)
                                             VALUES (${_aidPackage.name}, ${_aidPackage.description}, ${_aidPackage.status});`;
             sql:ExecutionResult result = check dbClient->execute(query);
-            _aidPackage.packageID = <int> result.lastInsertId;
+            if result.lastInsertId is int {
+                _aidPackage.packageID = <int> result.lastInsertId;
+            }
+
+            error? e = dbClient.close();
+            if e is error {
+                return _aidPackage.packageID;
+            }
+        }
+        return _aidPackage.packageID;
+    }
+
+    # A resource for modifying aid-package
+    # + return - packageID
+    resource function patch AidPackage(@http:Payload json aidPackage) returns int|error {
+        AidPackage _aidPackage = check aidPackage.fromJsonWithType();
+        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
+
+        if dbClient is mysql:Client {
+            sql:ParameterizedQuery query = `UPDATE AID_PACKAGE
+                                            SET
+                                            NAME=COALESCE(${_aidPackage.name},NAME), 
+                                            DESCRIPTION=COALESCE(${_aidPackage.description},DESCRIPTION),
+                                            STATUS=COALESCE(${_aidPackage.status},STATUS)
+                                            WHERE PACKAGEID=${_aidPackage.packageID};`;
+            sql:ExecutionResult result = check dbClient->execute(query);
+            if result.lastInsertId is int {
+                _aidPackage.packageID = <int> result.lastInsertId;
+            }
 
             error? e = dbClient.close();
             if e is error {
@@ -147,9 +179,9 @@ service /admin on new http:Listener(9090) {
         return aidPackage.toJson(); //OBJECTS
     }
 
-    # A resource for creating aidPackage;
-    # + return - packageID
-    resource function post AidPackage/[int packageID]/AidPackageItem(@http:Payload json aidPackageItem) returns http:BadRequest|int|error {
+    # A resource for creating aidPackageItem;
+    # + return - packageItemID
+    resource function post AidPackage/[int packageID]/AidPackageItem(@http:Payload json aidPackageItem) returns int|error {
         AidPackageItem _aidPackageItem = check aidPackageItem.fromJsonWithType();
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -157,7 +189,9 @@ service /admin on new http:Listener(9090) {
             sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QTY)
                                             VALUES (${_aidPackageItem.quotationID}, ${packageID}, ${_aidPackageItem.needID}, ${_aidPackageItem.quantity});`;
             sql:ExecutionResult result = check dbClient->execute(query);
-            _aidPackageItem.packageItemID = <int> result.lastInsertId;
+            if result.lastInsertId is int {
+                _aidPackageItem.packageItemID = <int> result.lastInsertId;
+            }
 
             error? e = dbClient.close();
             if e is error {
@@ -166,4 +200,29 @@ service /admin on new http:Listener(9090) {
         }
         return _aidPackageItem.packageItemID;
     }
+
+    # A resource for updating aidPackageItem;
+    # + return - packageItemID
+    resource function put AidPackage/[int packageID]/AidPackageItem(@http:Payload json aidPackageItem) returns int|error {
+        AidPackageItem _aidPackageItem = check aidPackageItem.fromJsonWithType();
+        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
+
+        if dbClient is mysql:Client {
+            sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QTY)
+                                            VALUES (${_aidPackageItem.quotationID}, ${packageID}, ${_aidPackageItem.needID}, ${_aidPackageItem.quantity})
+                                            ON DUPLICATE KEY UPDATE 
+                                            QTY=COALESCE(${_aidPackageItem.quantity}, QTY);`;
+            sql:ExecutionResult result = check dbClient->execute(query);
+            if result.lastInsertId is int {
+                _aidPackageItem.packageItemID = <int> result.lastInsertId;
+            }
+
+            error? e = dbClient.close();
+            if e is error {
+                return _aidPackageItem.packageItemID;
+            }
+        }
+        return _aidPackageItem.packageItemID;
+    }
+
 }

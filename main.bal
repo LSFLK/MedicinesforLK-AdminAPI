@@ -25,7 +25,7 @@ type Donor record {
 
 // Main Types
 type MedicalItem record {
-  int itemID; 
+  int itemID=-1; 
   string name; 
   string shortName; 
   string email;
@@ -33,46 +33,47 @@ type MedicalItem record {
 };
 type RequirementList record {
   string name;
-  MedicalNeed[] needs;
+  MedicalNeed[] needs = [];
 };
 type MedicalNeed record {
-  int needID;
+  int needID=-1;
   int itemID;
   int beneficiaryID; 
   time:Date period;
   string urgency;
   int quantity;
-  Beneficiary? beneficiary;
+  Beneficiary? beneficiary = ();
 };
 type Quotation record {
-  int quotationID;
+  int quotationID=-1;
   int supplierID;
   int itemID;
+  string brandName;
   int availableQuantity;
   time:Date expiryDate; 
   string regulatoryInfo;
-  string brandName;
-  int unitPrice;
-  Supplier? supplier;
-  MedicalItem? medicalItem;
+  decimal unitPrice;
+  Supplier? supplier = ();
+  MedicalItem? medicalItem = ();
 };
 type AidPackage record {
   int packageID=-1;
-  string description;
-  string name;
-  string status;
-  AidPackageItem?[] aidPackageItems=[];
+  string? description = ();
+  string? name = ();
+  string status="Draft";
+  AidPackageItem[] aidPackageItems=[];
 };
 type AidPackageItem record {
   int packageItemID=-1;
   int packageID;
   int quotationID;
   int needID;
-  decimal quantity;
-  int totalAmount;
-  Quotation? quotation;
+  int quantity;
+  decimal totalAmount;
+  Quotation? quotation = ();
 };
 type Pledge record {
+  int pledgeID=-1;
   int packageID;
   int donorID; 
   decimal amount;
