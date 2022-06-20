@@ -93,7 +93,7 @@ service /admin on new http:Listener(9090) {
         return _quotation.quotationID;
     }
 
-    # A resource for creating aid-package
+    # A resource for creating aidPackage
     # + return - packageID
     resource function post AidPackage(@http:Payload json aidPackage) returns int|error {
         AidPackage _aidPackage = check aidPackage.fromJsonWithType();
@@ -115,7 +115,7 @@ service /admin on new http:Listener(9090) {
         return _aidPackage.packageID;
     }
 
-    # A resource for modifying aid-package
+    # A resource for modifying aidPackage
     # + return - packageID
     resource function patch AidPackage(@http:Payload json aidPackage) returns int|error {
         AidPackage _aidPackage = check aidPackage.fromJsonWithType();
@@ -148,7 +148,7 @@ service /admin on new http:Listener(9090) {
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
         if dbClient is mysql:Client {
-            stream<AidPackage, error?> resultStream = dbClient->query(`SELECT NAME, DESCRIPTION, STATUS FROM AID_PACKAGE WHERE ${status} IS NULL OR STATUS=${status};`);
+            stream<AidPackage, error?> resultStream = dbClient->query(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS FROM AID_PACKAGE WHERE ${status} IS NULL OR STATUS=${status};`);
             check from AidPackage aidPackage in resultStream
             do {
                 aidPackages.push(aidPackage);

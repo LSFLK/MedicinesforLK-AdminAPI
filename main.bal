@@ -65,11 +65,11 @@ type AidPackage record {
 };
 type AidPackageItem record {
   int packageItemID=-1;
-  int packageID;
+  int packageID=-1;
   int quotationID;
   int needID;
   int quantity;
-  decimal totalAmount;
+  decimal totalAmount = 0;
   Quotation? quotation = ();
 };
 type Pledge record {
