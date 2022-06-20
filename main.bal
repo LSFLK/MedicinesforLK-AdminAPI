@@ -79,3 +79,13 @@ type Pledge record {
   decimal amount;
   string status;
 };
+
+// Information type
+type MedicalNeedInfo record {
+  int needID=-1;
+  time:Date period;
+  string urgency;
+  int quantity;
+  Beneficiary? beneficiary = ();
+  Quotation[] supplierQuotes = [];
+};
