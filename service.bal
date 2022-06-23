@@ -77,8 +77,10 @@ service /admin on new http:Listener(9090) {
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
         if dbClient is mysql:Client {
-            sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, NEEDID, BRANDNAME, AVAILABLEQUANTITY, EXPIRYDATE, UNITPRICE, REGULATORYINFO)
-                                            VALUES (${_quotation.supplierID}, ${_quotation.needID}, ${_quotation.brandName}, ${_quotation.availableQuantity},
+            sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD,
+                                                                  EXPIRYDATE, UNITPRICE, REGULATORYINFO)
+                                            VALUES (${_quotation.supplierID}, ${_quotation.itemID}, ${_quotation.brandName},
+                                                    ${_quotation.availableQuantity}, ${_quotation.period},
                                                     ${_quotation.expiryDate}, ${_quotation.unitPrice}, ${_quotation.regulatoryInfo});`;
             sql:ExecutionResult result = check dbClient->execute(query);
             if result.lastInsertId is int {
@@ -280,9 +282,9 @@ service /admin on new http:Listener(9090) {
                 stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID, BRANDNAME,
                                                                                    AVAILABLEQUANTITY, EXPIRYDATE,
                                                                                    UNITPRICE, REGULATORYINFO
-                                                                                   FROM QUOTATION Q
-                                                                                   RIGHT JOIN MEDICAL_NEED N ON Q.NEEDID=N.NEEDID
-                                                                                   WHERE N.NEEDID=${info.needID} AND QUOTATIONID IS NOT NULL;`);
+                                                                                   FROM MEDICAL_NEED N
+                                                                                   RIGHT JOIN QUOTATION Q ON Q.ITEMID=N.ITEMID
+                                                                                   WHERE Q.PERIOD=${info.period};`);
                 check from Quotation quotation in resultQuotationStream
                 do {
                     info.supplierQuotes.push(quotation);

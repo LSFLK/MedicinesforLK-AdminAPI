@@ -48,14 +48,14 @@ type MedicalNeed record {
 type Quotation record {
   int quotationID=-1;
   int supplierID;
-  int needID;
+  int itemID;
   string brandName;
   int availableQuantity;
+  time:Date period;
   time:Date expiryDate; 
   string regulatoryInfo;
   decimal unitPrice;
   Supplier? supplier = ();
-  MedicalNeed? medicalNeed = ();
 };
 type AidPackage record {
   int packageID=-1;
