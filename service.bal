@@ -77,6 +77,7 @@ service /admin on new http:Listener(9090) {
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
         if dbClient is mysql:Client {
+            _quotation.period.day=1;
             sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD,
                                                                   EXPIRYDATE, UNITPRICE, REGULATORYINFO)
                                             VALUES (${_quotation.supplierID}, ${_quotation.itemID}, ${_quotation.brandName},
@@ -270,6 +271,7 @@ service /admin on new http:Listener(9090) {
                                                                             LEFT JOIN MEDICAL_ITEM I ON I.ITEMID=N.ITEMID;`);
             check from MedicalNeedInfo info in resultStream
             do {
+                info.period.day = 1;
                 info.supplierQuotes = [];
                 medicalNeedInfo.push(info);
             };
@@ -280,11 +282,11 @@ service /admin on new http:Listener(9090) {
                 info.beneficiary = beneficiary;
 
                 stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                                   AVAILABLEQUANTITY, EXPIRYDATE,
+                                                                                   AVAILABLEQUANTITY, Q.PERIOD, EXPIRYDATE,
                                                                                    UNITPRICE, REGULATORYINFO
                                                                                    FROM MEDICAL_NEED N
                                                                                    RIGHT JOIN QUOTATION Q ON Q.ITEMID=N.ITEMID
-                                                                                   WHERE Q.PERIOD=${info.period};`);
+                                                                                   WHERE DATEDIFF(Q.PERIOD, ${info.period})=0;`);
                 check from Quotation quotation in resultQuotationStream
                 do {
                     info.supplierQuotes.push(quotation);
