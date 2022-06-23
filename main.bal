@@ -41,20 +41,21 @@ type MedicalNeed record {
   int beneficiaryID; 
   time:Date period;
   string urgency;
-  int quantity;
+  int neededQuantity;
   Beneficiary? beneficiary = ();
+  MedicalItem? medicalItem = ();
 };
 type Quotation record {
   int quotationID=-1;
   int supplierID;
-  int itemID;
+  int needID;
   string brandName;
   int availableQuantity;
   time:Date expiryDate; 
   string regulatoryInfo;
   decimal unitPrice;
   Supplier? supplier = ();
-  MedicalItem? medicalItem = ();
+  MedicalNeed? medicalNeed = ();
 };
 type AidPackage record {
   int packageID=-1;
@@ -83,9 +84,11 @@ type Pledge record {
 // Information type
 type MedicalNeedInfo record {
   int needID=-1;
+  string name;
   time:Date period;
   string urgency;
-  int quantity;
+  int neededQuantity;
+  int remainingQuantity;
   Beneficiary? beneficiary = ();
   Quotation[] supplierQuotes = [];
 };

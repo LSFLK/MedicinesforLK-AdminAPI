@@ -77,8 +77,8 @@ service /admin on new http:Listener(9090) {
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
         if dbClient is mysql:Client {
-            sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, EXPIRYDATE, UNITPRICE, REGULATORYINFO)
-                                            VALUES (${_quotation.supplierID}, ${_quotation.itemID}, ${_quotation.brandName}, ${_quotation.availableQuantity},
+            sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, NEEDID, BRANDNAME, AVAILABLEQUANTITY, EXPIRYDATE, UNITPRICE, REGULATORYINFO)
+                                            VALUES (${_quotation.supplierID}, ${_quotation.needID}, ${_quotation.brandName}, ${_quotation.availableQuantity},
                                                     ${_quotation.expiryDate}, ${_quotation.unitPrice}, ${_quotation.regulatoryInfo});`;
             sql:ExecutionResult result = check dbClient->execute(query);
             if result.lastInsertId is int {
@@ -211,6 +211,11 @@ service /admin on new http:Listener(9090) {
             sql:ExecutionResult result = check dbClient->execute(query);
             if result.lastInsertId is int {
                 _aidPackageItem.packageItemID = <int> result.lastInsertId;
+
+                query = `UPDATE MEDICAL_NEED
+                         SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${_aidPackageItem.needID})
+                         WHERE NEEDID=${_aidPackageItem.needID};`;
+                _ = check dbClient->execute(query);
             }
 
             error? e = dbClient.close();
@@ -235,6 +240,11 @@ service /admin on new http:Listener(9090) {
             sql:ExecutionResult result = check dbClient->execute(query);
             if result.lastInsertId is int {
                 _aidPackageItem.packageItemID = <int> result.lastInsertId;
+
+                query = `UPDATE MEDICAL_NEED
+                         SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${_aidPackageItem.needID})
+                         WHERE NEEDID=${_aidPackageItem.needID};`;
+                _ = check dbClient->execute(query);
             }
 
             error? e = dbClient.close();
@@ -252,8 +262,10 @@ service /admin on new http:Listener(9090) {
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
         if dbClient is mysql:Client {
-            stream<MedicalNeedInfo, error?> resultStream = dbClient->query(`SELECT NEEDID, PERIOD, URGENCY
-                                                                            FROM MEDICAL_NEED;`);
+            stream<MedicalNeedInfo, error?> resultStream = dbClient->query(`SELECT I.NAME, NEEDID, PERIOD, URGENCY,
+                                                                            NEEDEDQUANTITY, REMAININGQUANTITY
+                                                                            FROM MEDICAL_NEED N
+                                                                            LEFT JOIN MEDICAL_ITEM I ON I.ITEMID=N.ITEMID;`);
             check from MedicalNeedInfo info in resultStream
             do {
                 info.supplierQuotes = [];
@@ -261,15 +273,16 @@ service /admin on new http:Listener(9090) {
             };
             foreach MedicalNeedInfo info in medicalNeedInfo {
                 Beneficiary beneficiary = check dbClient->queryRow(`SELECT B.BENEFICIARYID, B.NAME, B.SHORTNAME, B.EMAIL, B.PHONENUMBER 
-                                                                     FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M 
-                                                                     ON B.BENEFICIARYID=M.BENEFICIARYID
+                                                                     FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M ON B.BENEFICIARYID=M.BENEFICIARYID
                                                                      WHERE M.NEEDID=${info.needID};`);
                 info.beneficiary = beneficiary;
 
                 stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID, BRANDNAME,
                                                                                    AVAILABLEQUANTITY, EXPIRYDATE,
                                                                                    UNITPRICE, REGULATORYINFO
-                                                                                   FROM QUOTATION;`);
+                                                                                   FROM QUOTATION Q
+                                                                                   RIGHT JOIN MEDICAL_NEED N ON Q.NEEDID=N.NEEDID
+                                                                                   WHERE N.NEEDID=${info.needID} AND QUOTATIONID IS NOT NULL;`);
                 check from Quotation quotation in resultQuotationStream
                 do {
                     info.supplierQuotes.push(quotation);
