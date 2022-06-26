@@ -313,8 +313,8 @@ service /admin on new http:Listener(9090) {
         return {"medicalNeedInfo": medicalNeedInfo}.toJson();
     }
 
-    # A resource for fetching all aidPackageUpdates of an aidPackage
-    # + return - list of aidPackageUpdates
+    # A resource for fetching all comments of an aidPackage
+    # + return - list of aidPackageUpdateComments
     resource function get AidPackage/UpdateComments(int packageID) returns json|error {
         AidPackageUpdate[] aidPackageUpdates = [];
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
@@ -330,10 +330,10 @@ service /admin on new http:Listener(9090) {
             };
             error? e = dbClient.close();
             if e is error {
-                return {"aidPackageUpdates":  aidPackageUpdates.toJson()};
+                return {"aidPackageUpdateComments":  aidPackageUpdates.toJson()};
             }
         }
-        return {"aidPackageUpdates":  aidPackageUpdates.toJson()};
+        return {"aidPackageUpdateComments":  aidPackageUpdates.toJson()};
     }
 
     # A resource for providing aidPackageUpdate
