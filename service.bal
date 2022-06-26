@@ -14,7 +14,8 @@ service /admin on new http:Listener(9090) {
 
         if dbClient is mysql:Client {
             sql:ParameterizedQuery query = `INSERT INTO SUPPLIER(NAME, SHORTNAME, EMAIL, PHONENUMBER)
-                                            VALUES (${_supplier.name}, ${_supplier.shortName}, ${_supplier.email}, ${_supplier.phoneNumber});`;
+                                            VALUES (${_supplier.name}, ${_supplier.shortName},
+                                                    ${_supplier.email}, ${_supplier.phoneNumber});`;
             sql:ExecutionResult result = check dbClient->execute(query);
             if result.lastInsertId is int {
                 _supplier.supplierID = <int> result.lastInsertId;
@@ -160,7 +161,8 @@ service /admin on new http:Listener(9090) {
                 aidPackages.push(aidPackage);
             };
             foreach AidPackage aidPackage in aidPackages {
-                stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID, NEEDID, QUANTITY, TOTALAMOUNT 
+                stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
+                                                                                          NEEDID, QUANTITY, TOTALAMOUNT 
                                                                                    FROM AID_PACKAGE_ITEM
                                                                                    WHERE PACKAGEID=${aidPackage.packageID};`);
                 check from AidPackageItem aidPackageItem in resultItemStream
@@ -186,7 +188,8 @@ service /admin on new http:Listener(9090) {
         if dbClient is mysql:Client {
             aidPackage = check dbClient->queryRow(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS FROM AID_PACKAGE
                                                    WHERE PACKAGEID=${packageID};`);
-            stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID, NEEDID, QUANTITY, TOTALAMOUNT 
+            stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
+                                                                                      NEEDID, QUANTITY, TOTALAMOUNT 
                                                                                FROM AID_PACKAGE_ITEM
                                                                                WHERE PACKAGEID=${packageID};`);
             aidPackage.aidPackageItems = [];
@@ -202,7 +205,7 @@ service /admin on new http:Listener(9090) {
         return aidPackage.toJson();
     }
 
-    # A resource for creating aidPackageItem;
+    # A resource for creating aidPackageItem
     # + return - packageItemID
     resource function post AidPackage/[int packageID]/AidPackageItem(@http:Payload json aidPackageItem) returns int|error {
         AidPackageItem _aidPackageItem = check aidPackageItem.fromJsonWithType();
@@ -210,7 +213,8 @@ service /admin on new http:Listener(9090) {
 
         if dbClient is mysql:Client {
             sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
-                                            VALUES (${_aidPackageItem.quotationID}, ${packageID}, ${_aidPackageItem.needID}, ${_aidPackageItem.quantity});`;
+                                            VALUES (${_aidPackageItem.quotationID}, ${packageID},
+                                                    ${_aidPackageItem.needID}, ${_aidPackageItem.quantity});`;
             sql:ExecutionResult result = check dbClient->execute(query);
             if result.lastInsertId is int {
                 _aidPackageItem.packageItemID = <int> result.lastInsertId;
@@ -229,7 +233,7 @@ service /admin on new http:Listener(9090) {
         return _aidPackageItem.packageItemID;
     }
 
-    # A resource for updating aidPackageItem;
+    # A resource for updating aidPackageItem
     # + return - packageItemID
     resource function put AidPackage/[int packageID]/AidPackageItem(@http:Payload json aidPackageItem) returns int|error {
         AidPackageItem _aidPackageItem = check aidPackageItem.fromJsonWithType();
@@ -237,7 +241,8 @@ service /admin on new http:Listener(9090) {
 
         if dbClient is mysql:Client {
             sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
-                                            VALUES (${_aidPackageItem.quotationID}, ${packageID}, ${_aidPackageItem.needID}, ${_aidPackageItem.quantity})
+                                            VALUES (${_aidPackageItem.quotationID}, ${packageID},
+                                                    ${_aidPackageItem.needID}, ${_aidPackageItem.quantity})
                                             ON DUPLICATE KEY UPDATE 
                                             QUANTITY=COALESCE(${_aidPackageItem.quantity}, QUANTITY);`;
             sql:ExecutionResult result = check dbClient->execute(query);
@@ -306,5 +311,56 @@ service /admin on new http:Listener(9090) {
             }
         }
         return {"medicalNeedInfo": medicalNeedInfo}.toJson();
+    }
+
+    # A resource for fetching all aidPackageUpdates of an aidPackage
+    # + return - list of aidPackageUpdates
+    resource function get AidPackageUpdates(int packageID) returns json|error {
+        AidPackageUpdate[] aidPackageUpdates = [];
+        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
+
+        if dbClient is mysql:Client {
+            stream<AidPackageUpdate, error?> resultStream = dbClient->query(
+                                                  `SELECT PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME 
+                                                   FROM AID_PACKAGAE_UPDATE
+                                                   WHERE PACKAGEID=${packageID};`);
+            check from AidPackageUpdate aidPackageUpdate in resultStream
+            do {
+                aidPackageUpdates.push(aidPackageUpdate);
+            };
+            error? e = dbClient.close();
+            if e is error {
+                return {"aidPackageUpdates":  aidPackageUpdates.toJson()};
+            }
+        }
+        return {"aidPackageUpdates":  aidPackageUpdates.toJson()};
+    }
+
+    # A resource for providing aidPackageUpdate
+    # + return - aidPackageUpdateId
+    resource function put AidPackage/[int packageID]/Update(@http:Payload json aidPackageUpdate) returns int?|error {
+        AidPackageUpdate _aidPackageUpdate = check aidPackageUpdate.fromJsonWithType();
+        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
+
+        if dbClient is mysql:Client {
+            sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGAE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
+                                            VALUES (${packageID},
+                                                    IFNULL(${_aidPackageUpdate.packageUpdateId}, DEFAULT(PACKAGEUPDATEID)),
+                                                    ${_aidPackageUpdate.updateComment},
+                                                    FROM_UNIXTIME(${_aidPackageUpdate.dateTimeUtc[0]})
+                                                 ) ON DUPLICATE KEY UPDATE
+                                            DATETIME=FROM_UNIXTIME(COALESCE(${_aidPackageUpdate.dateTimeUtc[0]}, DATETIME)),
+                                            UPDATECOMMENT=COALESCE(${_aidPackageUpdate.updateComment}, UPDATECOMMENT);`;
+            sql:ExecutionResult result = check dbClient->execute(query);
+            if result.lastInsertId is int {
+                _aidPackageUpdate.packageUpdateId = <int> result.lastInsertId;
+            }
+
+            error? e = dbClient.close();
+            if e is error {
+                return _aidPackageUpdate.packageUpdateId;
+            }
+        }
+        return _aidPackageUpdate.packageUpdateId;
     }
 }

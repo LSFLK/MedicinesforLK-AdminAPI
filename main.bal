@@ -70,8 +70,15 @@ type AidPackageItem record {
   int quotationID;
   int needID;
   int quantity;
-  decimal totalAmount = 0;
-  Quotation? quotation = ();
+  decimal totalAmount=0;
+  Quotation? quotation=();
+};
+type AidPackageUpdate record {
+  int? packageUpdateId=();
+  int packageID=-1;
+  string updateComment;
+  time:Utc dateTimeUtc = time:utcNow();
+  string? dateTime=();
 };
 type Pledge record {
   int pledgeID=-1;
@@ -80,7 +87,13 @@ type Pledge record {
   decimal amount;
   string status;
 };
-
+type PledgeUpdate record {
+  int? pledgeUpdateId=();
+  int pledgeID=-1;
+  string updateComment;
+  time:Utc dateTimeUtc = time:utcNow();
+  string? dateTime=();
+};
 // Information type
 type MedicalNeedInfo record {
   int needID=-1;
