@@ -6,6 +6,56 @@ import ballerina/sql;
 # bound to port `9090`.
 service /admin on new http:Listener(9090) {
 
+    # A resource for reading all medicalNeedInfo
+    # + return - List of medicalNeedInfo
+    resource function get medicalNeedInfo() returns json|error {
+        MedicalNeedInfo[] medicalNeedInfo = [];
+        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
+
+        if dbClient is mysql:Client {
+            stream<MedicalNeedInfo, error?> resultStream = dbClient->query(`SELECT I.NAME, NEEDID, PERIOD, URGENCY,
+                                                                            NEEDEDQUANTITY, REMAININGQUANTITY
+                                                                            FROM MEDICAL_NEED N
+                                                                            LEFT JOIN MEDICAL_ITEM I ON I.ITEMID=N.ITEMID;`);
+            check from MedicalNeedInfo info in resultStream
+            do {
+                info.period.day = 1;
+                info.supplierQuotes = [];
+                medicalNeedInfo.push(info);
+            };
+            foreach MedicalNeedInfo info in medicalNeedInfo {
+                Beneficiary beneficiary = check dbClient->queryRow(`SELECT B.BENEFICIARYID, B.NAME, B.SHORTNAME, B.EMAIL, B.PHONENUMBER 
+                                                                     FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M ON B.BENEFICIARYID=M.BENEFICIARYID
+                                                                     WHERE M.NEEDID=${info.needID};`);
+                info.beneficiary = beneficiary;
+
+                stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                                   AVAILABLEQUANTITY, Q.PERIOD, EXPIRYDATE,
+                                                                                   UNITPRICE, REGULATORYINFO
+                                                                                   FROM MEDICAL_NEED N
+                                                                                   RIGHT JOIN QUOTATION Q ON Q.ITEMID=N.ITEMID
+                                                                                   WHERE DATEDIFF(Q.PERIOD, ${info.period})=0;`);
+                check from Quotation quotation in resultQuotationStream
+                do {
+                    info.supplierQuotes.push(quotation);
+                };
+
+                foreach Quotation quotation in info.supplierQuotes {
+                    Supplier supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
+                                                                   FROM SUPPLIER
+                                                                   WHERE SUPPLIERID=${quotation.supplierID};`);
+                    quotation.supplier = supplier;
+                }
+            }
+
+            error? e = dbClient.close();
+            if e is error {
+                return {"medicalNeedInfo": medicalNeedInfo}.toJson();
+            }
+        }
+        return {"medicalNeedInfo": medicalNeedInfo}.toJson();
+    }
+
     # A resource for creating supplier
     # + return - supplierID
     resource function post Supplier(@http:Payload json supplier) returns int|error {
@@ -263,56 +313,6 @@ service /admin on new http:Listener(9090) {
         return _aidPackageItem.packageItemID;
     }
 
-    # A resource for reading all medicalNeedInfo
-    # + return - List of medicalNeedInfo
-    resource function get medicalNeedInfo() returns json|error {
-        MedicalNeedInfo[] medicalNeedInfo = [];
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            stream<MedicalNeedInfo, error?> resultStream = dbClient->query(`SELECT I.NAME, NEEDID, PERIOD, URGENCY,
-                                                                            NEEDEDQUANTITY, REMAININGQUANTITY
-                                                                            FROM MEDICAL_NEED N
-                                                                            LEFT JOIN MEDICAL_ITEM I ON I.ITEMID=N.ITEMID;`);
-            check from MedicalNeedInfo info in resultStream
-            do {
-                info.period.day = 1;
-                info.supplierQuotes = [];
-                medicalNeedInfo.push(info);
-            };
-            foreach MedicalNeedInfo info in medicalNeedInfo {
-                Beneficiary beneficiary = check dbClient->queryRow(`SELECT B.BENEFICIARYID, B.NAME, B.SHORTNAME, B.EMAIL, B.PHONENUMBER 
-                                                                     FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M ON B.BENEFICIARYID=M.BENEFICIARYID
-                                                                     WHERE M.NEEDID=${info.needID};`);
-                info.beneficiary = beneficiary;
-
-                stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                                   AVAILABLEQUANTITY, Q.PERIOD, EXPIRYDATE,
-                                                                                   UNITPRICE, REGULATORYINFO
-                                                                                   FROM MEDICAL_NEED N
-                                                                                   RIGHT JOIN QUOTATION Q ON Q.ITEMID=N.ITEMID
-                                                                                   WHERE DATEDIFF(Q.PERIOD, ${info.period})=0;`);
-                check from Quotation quotation in resultQuotationStream
-                do {
-                    info.supplierQuotes.push(quotation);
-                };
-
-                foreach Quotation quotation in info.supplierQuotes {
-                    Supplier supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
-                                                                   FROM SUPPLIER
-                                                                   WHERE SUPPLIERID=${quotation.supplierID};`);
-                    quotation.supplier = supplier;
-                }
-            }
-
-            error? e = dbClient.close();
-            if e is error {
-                return {"medicalNeedInfo": medicalNeedInfo}.toJson();
-            }
-        }
-        return {"medicalNeedInfo": medicalNeedInfo}.toJson();
-    }
-
     # A resource for fetching all comments of an aidPackage
     # + return - list of aidPackageUpdateComments
     resource function get AidPackage/UpdateComments(int packageID) returns json|error {
@@ -336,7 +336,7 @@ service /admin on new http:Listener(9090) {
         return {"aidPackageUpdateComments":  aidPackageUpdates.toJson()};
     }
 
-    # A resource for providing aidPackageUpdate
+    # A resource for saving update with a comment to an aidPackage
     # + return - aidPackageUpdateId
     resource function put AidPackage/[int packageID]/UpdateComment(@http:Payload json aidPackageUpdate) returns int?|error {
         AidPackageUpdate _aidPackageUpdate = check aidPackageUpdate.fromJsonWithType();
