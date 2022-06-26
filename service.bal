@@ -315,7 +315,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for fetching all aidPackageUpdates of an aidPackage
     # + return - list of aidPackageUpdates
-    resource function get AidPackageUpdates(int packageID) returns json|error {
+    resource function get AidPackage/UpdateComments(int packageID) returns json|error {
         AidPackageUpdate[] aidPackageUpdates = [];
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -338,7 +338,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for providing aidPackageUpdate
     # + return - aidPackageUpdateId
-    resource function put AidPackage/[int packageID]/Update(@http:Payload json aidPackageUpdate) returns int?|error {
+    resource function put AidPackage/[int packageID]/UpdateComment(@http:Payload json aidPackageUpdate) returns int?|error {
         AidPackageUpdate _aidPackageUpdate = check aidPackageUpdate.fromJsonWithType();
         mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
 
