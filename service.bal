@@ -6,361 +6,286 @@ import ballerina/sql;
 # bound to port `9090`.
 service /admin on new http:Listener(9090) {
 
-    # A resource for reading all medicalNeedInfo
-    # + return - List of medicalNeedInfo
-    resource function get medicalNeedInfo() returns json|error {
+    # A resource for reading all MedicalNeedInfo
+    # + return - List of MedicalNeedInfo
+    resource function get medicalNeedInfo() 
+    returns MedicalNeedInfo[]|error {
         MedicalNeedInfo[] medicalNeedInfo = [];
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            stream<MedicalNeedInfo, error?> resultStream = dbClient->query(`SELECT I.NAME, NEEDID, PERIOD, URGENCY,
-                                                                            NEEDEDQUANTITY, REMAININGQUANTITY
-                                                                            FROM MEDICAL_NEED N
-                                                                            LEFT JOIN MEDICAL_ITEM I ON I.ITEMID=N.ITEMID;`);
-            check from MedicalNeedInfo info in resultStream
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        stream<MedicalNeedInfo, error?> resultStream = dbClient->query(`SELECT I.NAME, NEEDID, PERIOD, URGENCY,
+                                                                        NEEDEDQUANTITY, REMAININGQUANTITY
+                                                                        FROM MEDICAL_NEED N
+                                                                        LEFT JOIN MEDICAL_ITEM I ON I.ITEMID=N.ITEMID;`);
+        check from MedicalNeedInfo info in resultStream
+        do {
+            info.period.day = 1;
+            info.supplierQuotes = [];
+            medicalNeedInfo.push(info);
+        };
+        foreach MedicalNeedInfo info in medicalNeedInfo {
+            info.beneficiary = check dbClient->queryRow(`SELECT B.BENEFICIARYID, B.NAME, B.SHORTNAME, B.EMAIL, B.PHONENUMBER 
+                                                                FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M ON B.BENEFICIARYID=M.BENEFICIARYID
+                                                                WHERE M.NEEDID=${info.needID};`);
+            stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                               AVAILABLEQUANTITY, Q.PERIOD, EXPIRYDATE,
+                                                                               UNITPRICE, REGULATORYINFO
+                                                                               FROM MEDICAL_NEED N
+                                                                               RIGHT JOIN QUOTATION Q ON Q.ITEMID=N.ITEMID
+                                                                               WHERE DATEDIFF(Q.PERIOD, ${info.period})=0;`);
+            check from Quotation quotation in resultQuotationStream
             do {
-                info.period.day = 1;
-                info.supplierQuotes = [];
-                medicalNeedInfo.push(info);
+                info.supplierQuotes.push(quotation);
             };
-            foreach MedicalNeedInfo info in medicalNeedInfo {
-                Beneficiary beneficiary = check dbClient->queryRow(`SELECT B.BENEFICIARYID, B.NAME, B.SHORTNAME, B.EMAIL, B.PHONENUMBER 
-                                                                     FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M ON B.BENEFICIARYID=M.BENEFICIARYID
-                                                                     WHERE M.NEEDID=${info.needID};`);
-                info.beneficiary = beneficiary;
-
-                stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                                   AVAILABLEQUANTITY, Q.PERIOD, EXPIRYDATE,
-                                                                                   UNITPRICE, REGULATORYINFO
-                                                                                   FROM MEDICAL_NEED N
-                                                                                   RIGHT JOIN QUOTATION Q ON Q.ITEMID=N.ITEMID
-                                                                                   WHERE DATEDIFF(Q.PERIOD, ${info.period})=0;`);
-                check from Quotation quotation in resultQuotationStream
-                do {
-                    info.supplierQuotes.push(quotation);
-                };
-
-                foreach Quotation quotation in info.supplierQuotes {
-                    Supplier supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
-                                                                   FROM SUPPLIER
-                                                                   WHERE SUPPLIERID=${quotation.supplierID};`);
-                    quotation.supplier = supplier;
-                }
-            }
-
-            error? e = dbClient.close();
-            if e is error {
-                return {"medicalNeedInfo": medicalNeedInfo}.toJson();
+            foreach Quotation quotation in info.supplierQuotes {
+                quotation.supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER FROM SUPPLIER
+                                                               WHERE SUPPLIERID=${quotation.supplierID}`);
             }
         }
-        return {"medicalNeedInfo": medicalNeedInfo}.toJson();
+        check dbClient.close();
+        return medicalNeedInfo;
     }
 
-    # A resource for creating supplier
-    # + return - supplierID
-    resource function post Supplier(@http:Payload json supplier) returns int|error {
-        Supplier _supplier = check supplier.fromJsonWithType();
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            sql:ParameterizedQuery query = `INSERT INTO SUPPLIER(NAME, SHORTNAME, EMAIL, PHONENUMBER)
-                                            VALUES (${_supplier.name}, ${_supplier.shortName},
-                                                    ${_supplier.email}, ${_supplier.phoneNumber});`;
-            sql:ExecutionResult result = check dbClient->execute(query);
-            if result.lastInsertId is int {
-                _supplier.supplierID = <int> result.lastInsertId;
-            }
-
-            error? e = dbClient.close();
-            if e is error {
-                return _supplier.supplierID;
-            }
+    # A resource for creating Supplier
+    # + return - Supplier
+    resource function post Supplier(@http:Payload Supplier supplier) 
+    returns Supplier|error {
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        sql:ParameterizedQuery query = `INSERT INTO SUPPLIER(NAME, SHORTNAME, EMAIL, PHONENUMBER)
+                                        VALUES (${supplier.name}, ${supplier.shortName},
+                                                ${supplier.email}, ${supplier.phoneNumber});`;
+        sql:ExecutionResult result = check dbClient->execute(query);
+        if result.lastInsertId is int {
+            supplier.supplierID = <int> result.lastInsertId;
         }
-        return _supplier.supplierID;
+        check dbClient.close();
+        return supplier;
     }
 
-    # A resource for reading all suppliers
-    # + return - List of suppliers
-    resource function get Suppliers() returns json|error {
+    # A resource for reading all Suppliers
+    # + return - List of Suppliers
+    resource function get Suppliers() 
+    returns Supplier[]|error {
         Supplier[] suppliers = [];
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            stream<Supplier, error?> resultStream = dbClient->query(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER FROM SUPPLIER`);
-            check from Supplier supplier in resultStream
-            do {
-                suppliers.push(supplier);
-            };
-
-            error? e = dbClient.close();
-            if e is error {
-                return {"suppliers": suppliers}.toJson();
-            }
-        }
-        return {"suppliers": suppliers}.toJson();
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        stream<Supplier, error?> resultStream = dbClient->query(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER FROM SUPPLIER`);
+        check from Supplier supplier in resultStream
+        do {
+            suppliers.push(supplier);
+        };
+        check dbClient.close();
+        return suppliers;
     }
 
-    # A resource for fetching a supplier
-    # + return - A supplier
-    resource function get Supplier(int supplierId) returns json|error {
-        Supplier? supplier = ();
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER FROM SUPPLIER
-                                                 WHERE SUPPLIERID=${supplierId}`);
-
-            error? e = dbClient.close();
-            if e is error{
-                return {};
-            }
-        }
-        if supplier is Supplier {
-            return supplier.toJson();
-        }
-        return {};
+    # A resource for fetching a Supplier
+    # + return - A Supplier
+    resource function get Supplier(int supplierId) 
+    returns Supplier|error {
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        Supplier supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER FROM SUPPLIER
+                                                      WHERE SUPPLIERID=${supplierId}`);
+        check dbClient.close();
+        return supplier;
     }
 
-    # A resource for creating quotation
-    # + return - quoteID
-    resource function post Quotation(@http:Payload json quotation) returns int|error {
-        Quotation _quotation = check quotation.fromJsonWithType();
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            _quotation.period.day=1;
-            sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD,
-                                                                  EXPIRYDATE, UNITPRICE, REGULATORYINFO)
-                                            VALUES (${_quotation.supplierID}, ${_quotation.itemID}, ${_quotation.brandName},
-                                                    ${_quotation.availableQuantity}, ${_quotation.period},
-                                                    ${_quotation.expiryDate}, ${_quotation.unitPrice}, ${_quotation.regulatoryInfo});`;
-            sql:ExecutionResult result = check dbClient->execute(query);
-            if result.lastInsertId is int {
-                _quotation.quotationID = <int> result.lastInsertId;
-            }
-
-            error? e = dbClient.close();
-            if e is error {
-                return _quotation.quotationID;
-            }
+    # A resource for creating Quotation
+    # + return - Quotation
+    resource function post Quotation(@http:Payload Quotation quotation) 
+    returns Quotation|error {
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        quotation.period.day=1;
+        sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD,
+                                                              EXPIRYDATE, UNITPRICE, REGULATORYINFO)
+                                        VALUES (${quotation.supplierID}, ${quotation.itemID}, ${quotation.brandName},
+                                                ${quotation.availableQuantity}, ${quotation.period},
+                                                ${quotation.expiryDate}, ${quotation.unitPrice}, ${quotation.regulatoryInfo});`;
+        sql:ExecutionResult result = check dbClient->execute(query);
+        if result.lastInsertId is int {
+            quotation.quotationID = <int> result.lastInsertId;
         }
-        return _quotation.quotationID;
+        quotation.supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER FROM SUPPLIER
+                                                               WHERE SUPPLIERID=${quotation.supplierID}`);
+        check dbClient.close();
+        return quotation;
     }
 
-    # A resource for creating aidPackage
-    # + return - packageID
-    resource function post AidPackage(@http:Payload json aidPackage) returns int|error {
-        AidPackage _aidPackage = check aidPackage.fromJsonWithType();
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS)
-                                            VALUES (${_aidPackage.name}, ${_aidPackage.description}, ${_aidPackage.status});`;
-            sql:ExecutionResult result = check dbClient->execute(query);
-            if result.lastInsertId is int {
-                _aidPackage.packageID = <int> result.lastInsertId;
-            }
-
-            error? e = dbClient.close();
-            if e is error {
-                return _aidPackage.packageID;
-            }
-        }
-        return _aidPackage.packageID;
-    }
-
-    # A resource for modifying aidPackage
-    # + return - packageID
-    resource function patch AidPackage(@http:Payload json aidPackage) returns int|error {
-        AidPackage _aidPackage = check aidPackage.fromJsonWithType();
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            sql:ParameterizedQuery query = `UPDATE AID_PACKAGE
-                                            SET
-                                            NAME=COALESCE(${_aidPackage.name},NAME), 
-                                            DESCRIPTION=COALESCE(${_aidPackage.description},DESCRIPTION),
-                                            STATUS=COALESCE(${_aidPackage.status},STATUS)
-                                            WHERE PACKAGEID=${_aidPackage.packageID};`;
-            sql:ExecutionResult result = check dbClient->execute(query);
-            if result.lastInsertId is int {
-                _aidPackage.packageID = <int> result.lastInsertId;
-            }
-
-            error? e = dbClient.close();
-            if e is error {
-                return _aidPackage.packageID;
-            }
-        }
-        return _aidPackage.packageID;
-    }
-
-    # A resource for reading all aidPackages
-    # + return - List of aidPackages and optionally filter by status
-    resource function get AidPackages(string? status) returns json|error {
+    # A resource for reading all Aid-Packages
+    # + return - List of Aid-Packages and optionally filter by status
+    resource function get AidPackages(string? status) 
+    returns AidPackage[]|error {
         AidPackage[] aidPackages = [];
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            stream<AidPackage, error?> resultStream = dbClient->query(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS 
-                                                                       FROM AID_PACKAGE
-                                                                       WHERE ${status} IS NULL OR STATUS=${status};`);
-            check from AidPackage aidPackage in resultStream
-            do {
-                aidPackage.aidPackageItems = [];
-                aidPackages.push(aidPackage);
-            };
-            foreach AidPackage aidPackage in aidPackages {
-                stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
-                                                                                          NEEDID, QUANTITY, TOTALAMOUNT 
-                                                                                   FROM AID_PACKAGE_ITEM
-                                                                                   WHERE PACKAGEID=${aidPackage.packageID};`);
-                check from AidPackageItem aidPackageItem in resultItemStream
-                do {
-                    aidPackage.aidPackageItems.push(aidPackageItem);
-                };
-            }
-
-            error? e = dbClient.close();
-            if e is error {
-                return {"aidPackages": aidPackages}.toJson();
-            }
-        }
-        return {"aidPackages": aidPackages}.toJson();
-    }
-
-    # A resource for fetching an aidPackage
-    # + return - An aidPackage
-    resource function get AidPackage(int packageID) returns json|error {
-        AidPackage aidPackage = {};
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            aidPackage = check dbClient->queryRow(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS FROM AID_PACKAGE
-                                                   WHERE PACKAGEID=${packageID};`);
-            stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
-                                                                                      NEEDID, QUANTITY, TOTALAMOUNT 
-                                                                               FROM AID_PACKAGE_ITEM
-                                                                               WHERE PACKAGEID=${packageID};`);
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        stream<AidPackage, error?> resultStream = dbClient->query(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS 
+                                                                    FROM AID_PACKAGE
+                                                                    WHERE ${status} IS NULL OR STATUS=${status};`);
+        check from AidPackage aidPackage in resultStream
+        do {
             aidPackage.aidPackageItems = [];
+            aidPackages.push(aidPackage);
+        };
+        foreach AidPackage aidPackage in aidPackages {
+            stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
+                                                                               NEEDID, QUANTITY, TOTALAMOUNT 
+                                                                               FROM AID_PACKAGE_ITEM
+                                                                               WHERE PACKAGEID=${aidPackage.packageID};`);
             check from AidPackageItem aidPackageItem in resultItemStream
             do {
                 aidPackage.aidPackageItems.push(aidPackageItem);
             };
-            error? e = dbClient.close();
-            if e is error {
-                return aidPackage.toJson();
-            }
         }
-        return aidPackage.toJson();
+        check dbClient.close();
+        return aidPackages;
     }
 
-    # A resource for creating aidPackageItem
-    # + return - packageItemID
-    resource function post AidPackage/[int packageID]/AidPackageItem(@http:Payload json aidPackageItem) returns int|error {
-        AidPackageItem _aidPackageItem = check aidPackageItem.fromJsonWithType();
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
-                                            VALUES (${_aidPackageItem.quotationID}, ${packageID},
-                                                    ${_aidPackageItem.needID}, ${_aidPackageItem.quantity});`;
-            sql:ExecutionResult result = check dbClient->execute(query);
-            if result.lastInsertId is int {
-                _aidPackageItem.packageItemID = <int> result.lastInsertId;
-
-                query = `UPDATE MEDICAL_NEED
-                         SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${_aidPackageItem.needID})
-                         WHERE NEEDID=${_aidPackageItem.needID};`;
-                _ = check dbClient->execute(query);
-            }
-
-            error? e = dbClient.close();
-            if e is error {
-                return _aidPackageItem.packageItemID;
-            }
-        }
-        return _aidPackageItem.packageItemID;
+    # A resource for fetching an Aid-Package
+    # + return - Aid-Package
+    resource function get AidPackage(int packageID) 
+    returns AidPackage|error {
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        AidPackage aidPackage = check dbClient->queryRow(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS FROM AID_PACKAGE
+                                                          WHERE PACKAGEID=${packageID};`);
+        stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
+                                                                           NEEDID, QUANTITY, TOTALAMOUNT 
+                                                                           FROM AID_PACKAGE_ITEM
+                                                                           WHERE PACKAGEID=${packageID};`);
+        aidPackage.aidPackageItems = [];
+        check from AidPackageItem aidPackageItem in resultItemStream
+        do {
+            aidPackage.aidPackageItems.push(aidPackageItem);
+        };
+        check dbClient.close();
+        return aidPackage;
     }
 
-    # A resource for updating aidPackageItem
-    # + return - packageItemID
-    resource function put AidPackage/[int packageID]/AidPackageItem(@http:Payload json aidPackageItem) returns int|error {
-        AidPackageItem _aidPackageItem = check aidPackageItem.fromJsonWithType();
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
-                                            VALUES (${_aidPackageItem.quotationID}, ${packageID},
-                                                    ${_aidPackageItem.needID}, ${_aidPackageItem.quantity})
-                                            ON DUPLICATE KEY UPDATE 
-                                            QUANTITY=COALESCE(${_aidPackageItem.quantity}, QUANTITY);`;
-            sql:ExecutionResult result = check dbClient->execute(query);
-            if result.lastInsertId is int {
-                _aidPackageItem.packageItemID = <int> result.lastInsertId;
-
-                query = `UPDATE MEDICAL_NEED
-                         SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${_aidPackageItem.needID})
-                         WHERE NEEDID=${_aidPackageItem.needID};`;
-                _ = check dbClient->execute(query);
-            }
-
-            error? e = dbClient.close();
-            if e is error {
-                return _aidPackageItem.packageItemID;
-            }
+    # A resource for creating Aid-Package
+    # + return - Aid-Package
+    resource function post AidPackage(@http:Payload AidPackage aidPackage) 
+    returns AidPackage|error {
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS)
+                                        VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status});`;
+        sql:ExecutionResult result = check dbClient->execute(query);
+        if result.lastInsertId is int {
+            aidPackage.packageID = <int> result.lastInsertId;
         }
-        return _aidPackageItem.packageItemID;
+        check dbClient.close();
+        return aidPackage;
     }
 
-    # A resource for fetching all comments of an aidPackage
-    # + return - list of aidPackageUpdateComments
-    resource function get AidPackage/UpdateComments(int packageID) returns json|error {
+    # A resource for modifying Aid-Package
+    # + return - Aid-Package
+    resource function patch AidPackage(@http:Payload AidPackage aidPackage) 
+    returns AidPackage|error {
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        sql:ParameterizedQuery query = `UPDATE AID_PACKAGE
+                                        SET
+                                        NAME=COALESCE(${aidPackage.name},NAME), 
+                                        DESCRIPTION=COALESCE(${aidPackage.description},DESCRIPTION),
+                                        STATUS=COALESCE(${aidPackage.status},STATUS)
+                                        WHERE PACKAGEID=${aidPackage.packageID};`;
+        sql:ExecutionResult result = check dbClient->execute(query);
+        if result.lastInsertId is int {
+            aidPackage.packageID = <int> result.lastInsertId;
+        }
+        check dbClient.close();
+        return aidPackage;
+    }
+
+    # A resource for creating AidPackage-Item
+    # + return - AidPackage-Item
+    resource function post AidPackage/[int packageID]/AidPackageItem(@http:Payload AidPackageItem aidPackageItem) 
+    returns AidPackageItem|error {
+        aidPackageItem.packageID = packageID;
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
+                                        VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
+                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity});`;
+        sql:ExecutionResult result = check dbClient->execute(query);
+        if result.lastInsertId is int {
+            aidPackageItem.packageItemID = <int> result.lastInsertId;
+            query = `UPDATE MEDICAL_NEED
+                     SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
+                     WHERE NEEDID=${aidPackageItem.needID};`;
+            _ = check dbClient->execute(query);
+            aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                UNITPRICE, REGULATORYINFO
+                                                                FROM QUOTATION 
+                                                                WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+        }
+        check dbClient.close();
+        return aidPackageItem;
+    }
+
+    # A resource for updating AidPackage-Item
+    # + return - AidPackage-Item
+    resource function put AidPackage/[int packageID]/AidPackageItem(@http:Payload AidPackageItem aidPackageItem) 
+    returns AidPackageItem|error {
+        aidPackageItem.packageID = packageID;
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
+                                        VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
+                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity})
+                                        ON DUPLICATE KEY UPDATE 
+                                        QUANTITY=COALESCE(${aidPackageItem.quantity}, QUANTITY);`;
+        sql:ExecutionResult result = check dbClient->execute(query);
+        if result.lastInsertId is int {
+            aidPackageItem.packageItemID = <int> result.lastInsertId;
+            query = `UPDATE MEDICAL_NEED
+                     SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
+                     WHERE NEEDID=${aidPackageItem.needID};`;
+            _ = check dbClient->execute(query);
+            aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                UNITPRICE, REGULATORYINFO
+                                                                FROM QUOTATION 
+                                                                WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+        }
+        check dbClient.close();
+        return aidPackageItem;
+    }
+
+    # A resource for fetching all comments of an Aid-Package
+    # + return - list of AidPackageUpdateComments
+    resource function get AidPackage/UpdateComments(int packageID) 
+    returns AidPackageUpdate[]|error {
         AidPackageUpdate[] aidPackageUpdates = [];
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            stream<AidPackageUpdate, error?> resultStream = dbClient->query(
-                                                  `SELECT PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME 
-                                                   FROM AID_PACKAGAE_UPDATE
-                                                   WHERE PACKAGEID=${packageID};`);
-            check from AidPackageUpdate aidPackageUpdate in resultStream
-            do {
-                aidPackageUpdates.push(aidPackageUpdate);
-            };
-            error? e = dbClient.close();
-            if e is error {
-                return {"aidPackageUpdateComments":  aidPackageUpdates.toJson()};
-            }
-        }
-        return {"aidPackageUpdateComments":  aidPackageUpdates.toJson()};
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        stream<AidPackageUpdate, error?> resultStream = dbClient->query( `SELECT
+                                                PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME 
+                                                FROM AID_PACKAGAE_UPDATE
+                                                WHERE PACKAGEID=${packageID};`);
+        check from AidPackageUpdate aidPackageUpdate in resultStream
+        do {
+            aidPackageUpdates.push(aidPackageUpdate);
+        };
+        check dbClient.close();
+        return aidPackageUpdates;
     }
 
     # A resource for saving update with a comment to an aidPackage
     # + return - aidPackageUpdateId
-    resource function put AidPackage/[int packageID]/UpdateComment(@http:Payload json aidPackageUpdate) returns int?|error {
-        AidPackageUpdate _aidPackageUpdate = check aidPackageUpdate.fromJsonWithType();
-        mysql:Client|sql:Error dbClient = new (dbHost, dbUser, dbPass, db, dbPort);
-
-        if dbClient is mysql:Client {
-            sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGAE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
-                                            VALUES (${packageID},
-                                                    IFNULL(${_aidPackageUpdate.packageUpdateId}, DEFAULT(PACKAGEUPDATEID)),
-                                                    ${_aidPackageUpdate.updateComment},
-                                                    FROM_UNIXTIME(${_aidPackageUpdate.dateTimeUtc[0]})
-                                                 ) ON DUPLICATE KEY UPDATE
-                                            DATETIME=FROM_UNIXTIME(COALESCE(${_aidPackageUpdate.dateTimeUtc[0]}, DATETIME)),
-                                            UPDATECOMMENT=COALESCE(${_aidPackageUpdate.updateComment}, UPDATECOMMENT);`;
-            sql:ExecutionResult result = check dbClient->execute(query);
-            if result.lastInsertId is int {
-                _aidPackageUpdate.packageUpdateId = <int> result.lastInsertId;
-            }
-
-            error? e = dbClient.close();
-            if e is error {
-                return _aidPackageUpdate.packageUpdateId;
-            }
+    resource function put AidPackage/[int packageID]/UpdateComment(@http:Payload AidPackageUpdate aidPackageUpdate) 
+    returns AidPackageUpdate?|error {
+        aidPackageUpdate.packageID = packageID;
+        mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
+        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGAE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
+                                        VALUES (${aidPackageUpdate.packageID},
+                                                IFNULL(${aidPackageUpdate.packageUpdateId}, DEFAULT(PACKAGEUPDATEID)),
+                                                ${aidPackageUpdate.updateComment},
+                                                FROM_UNIXTIME(${aidPackageUpdate.dateTimeUtc[0]})
+                                        ) ON DUPLICATE KEY UPDATE
+                                        DATETIME=FROM_UNIXTIME(COALESCE(${aidPackageUpdate.dateTimeUtc[0]}, DATETIME)),
+                                        UPDATECOMMENT=COALESCE(${aidPackageUpdate.updateComment}, UPDATECOMMENT);`;
+        sql:ExecutionResult result = check dbClient->execute(query);
+        if result.lastInsertId is int {
+            aidPackageUpdate.packageUpdateId = <int> result.lastInsertId;
+            aidPackageUpdate.dateTime= check dbClient->queryRow( `SELECT DATETIME 
+                                                                  FROM AID_PACKAGAE_UPDATE
+                                                                  WHERE PACKAGEUPDATEID=${aidPackageUpdate.packageUpdateId};`);
         }
-        return _aidPackageUpdate.packageUpdateId;
+        check dbClient.close();
+        return aidPackageUpdate;
     }
 }

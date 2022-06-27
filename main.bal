@@ -1,22 +1,22 @@
 import ballerina/time;
 
-// Stakeholders (Main Actors)
+// Stakeholders
 type Supplier record {
-  int supplierID = -1;
+  int? supplierID=();
   string name;
   string shortName;
   string email;
   string phoneNumber;
 };
 type Beneficiary record {
-  int beneficiaryID = -1;
+  int? beneficiaryID=();
   string name;
   string shortName;
   string email;
   string phoneNumber;
 };
 type Donor record {
-  int donarID = -1;
+  int? donarID=();
   string orgName;
   string orgLink;
   string email;
@@ -25,7 +25,7 @@ type Donor record {
 
 // Main Types
 type MedicalItem record {
-  int itemID=-1; 
+  int? itemID=();
   string name; 
   string shortName; 
   string email;
@@ -36,7 +36,7 @@ type RequirementList record {
   MedicalNeed[] needs = [];
 };
 type MedicalNeed record {
-  int needID=-1;
+  int? needID=();
   int itemID;
   int beneficiaryID; 
   time:Date period;
@@ -46,27 +46,27 @@ type MedicalNeed record {
   MedicalItem? medicalItem = ();
 };
 type Quotation record {
-  int quotationID=-1;
+  int? quotationID=();
   int supplierID;
-  int itemID;
+  int? itemID=();
   string brandName;
   int availableQuantity;
   time:Date period;
   time:Date expiryDate; 
   string regulatoryInfo;
   decimal unitPrice;
-  Supplier? supplier = ();
+  Supplier? supplier=();
 };
 type AidPackage record {
-  int packageID=-1;
-  string? description = ();
-  string? name = ();
-  string status="Draft";
-  AidPackageItem[] aidPackageItems=[];
+  int? packageID=();
+  string? description=();
+  string? name=();
+  string? status="Draft";
+  AidPackageItem?[] aidPackageItems=[];
 };
 type AidPackageItem record {
-  int packageItemID=-1;
-  int packageID=-1;
+  int? packageItemID=();
+  int? packageID=();
   int quotationID;
   int needID;
   int quantity;
@@ -75,13 +75,13 @@ type AidPackageItem record {
 };
 type AidPackageUpdate record {
   int? packageUpdateId=();
-  int packageID=-1;
+  int? packageID=();
   string updateComment;
   time:Utc dateTimeUtc = time:utcNow();
   string? dateTime=();
 };
 type Pledge record {
-  int pledgeID=-1;
+  int? pledgeID=();
   int packageID;
   int donorID; 
   decimal amount;
@@ -89,19 +89,19 @@ type Pledge record {
 };
 type PledgeUpdate record {
   int? pledgeUpdateId=();
-  int pledgeID=-1;
+  int? pledgeID=();
   string updateComment;
   time:Utc dateTimeUtc = time:utcNow();
   string? dateTime=();
 };
 // Information type
 type MedicalNeedInfo record {
-  int needID=-1;
+  int needID;
   string name;
   time:Date period;
   string urgency;
   int neededQuantity;
   int remainingQuantity;
-  Beneficiary? beneficiary = ();
+  Beneficiary? beneficiary=();
   Quotation[] supplierQuotes = [];
 };
