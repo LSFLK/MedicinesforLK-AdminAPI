@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "elixir": {
+      "type": "object",
+      "properties": {
+        "admin_api": {
+          "type": "object",
+          "properties": {
+            "dbHost": {
+              "type": "string",
+              "description": ""
+            },
+            "dbPort": {
+              "type": "integer",
+              "description": ""
+            },
+            "dbUser": {
+              "type": "string",
+              "description": ""
+            },
+            "dbPass": {
+              "type": "string",
+              "description": ""
+            },
+            "db": {
+              "type": "string",
+              "description": ""
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
