@@ -2,6 +2,7 @@ import ballerina/http;
 import ballerinax/mysql;
 import ballerina/sql;
 import ballerina/time;
+import ballerina/io;
 
 # A service representing a network-accessible API
 # bound to port `9090`.
@@ -328,4 +329,15 @@ service /admin on new http:Listener(9090) {
         check dbClient.close();
         return aidPackageUpdate;
     }
+
+
+    # A resource for creating AidPackage-Item
+    # + return - AidPackage-Item
+    resource function post requirements(http:Caller caller,http:Request request) returns error? {
+        stream<byte[], io:Error?> streamer = check request.getByteStream();
+        check io:fileWriteBlocksFromStream("./files/ReceivedFile.pdf", streamer);
+        check streamer.close();
+        check caller->respond("File Received!");
+    }
+
 }
