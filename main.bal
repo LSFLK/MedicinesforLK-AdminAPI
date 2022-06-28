@@ -2,7 +2,7 @@ import ballerina/time;
 
 // Stakeholders
 type Supplier record {
-  int? supplierID=();
+  int supplierID = -1;
   string name;
   string shortName;
   string email;
@@ -48,7 +48,7 @@ type MedicalNeed record {
 type Quotation record {
   int? quotationID=();
   int supplierID;
-  int? itemID=();
+  int itemID;
   string brandName;
   int availableQuantity;
   time:Date period;
@@ -59,8 +59,8 @@ type Quotation record {
 };
 type AidPackage record {
   int? packageID=();
-  string? description=();
-  string? name=();
+  string description;
+  string name;
   string? status="Draft";
   AidPackageItem?[] aidPackageItems=[];
 };
@@ -77,7 +77,6 @@ type AidPackageUpdate record {
   int? packageUpdateId=();
   int? packageID=();
   string updateComment;
-  time:Utc dateTimeUtc = time:utcNow();
   string? dateTime=();
 };
 type Pledge record {
@@ -91,7 +90,6 @@ type PledgeUpdate record {
   int? pledgeUpdateId=();
   int? pledgeID=();
   string updateComment;
-  time:Utc dateTimeUtc = time:utcNow();
   string? dateTime=();
 };
 // Information type

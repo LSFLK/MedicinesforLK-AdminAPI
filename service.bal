@@ -1,6 +1,7 @@
 import ballerina/http;
 import ballerinax/mysql;
 import ballerina/sql;
+import ballerina/time;
 
 # A service representing a network-accessible API
 # bound to port `9090`.
@@ -18,11 +19,11 @@ service /admin on new http:Listener(9090) {
                                                                         LEFT JOIN MEDICAL_ITEM I ON I.ITEMID=N.ITEMID;`);
         check from MedicalNeedInfo info in resultStream
         do {
-            info.period.day = 1;
-            info.supplierQuotes = [];
             medicalNeedInfo.push(info);
         };
         foreach MedicalNeedInfo info in medicalNeedInfo {
+            info.period.day = 1;
+            info.supplierQuotes = [];
             info.beneficiary = check dbClient->queryRow(`SELECT B.BENEFICIARYID, B.NAME, B.SHORTNAME, B.EMAIL, B.PHONENUMBER 
                                                                 FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M ON B.BENEFICIARYID=M.BENEFICIARYID
                                                                 WHERE M.NEEDID=${info.needID};`);
@@ -119,10 +120,10 @@ service /admin on new http:Listener(9090) {
                                                                     WHERE ${status} IS NULL OR STATUS=${status};`);
         check from AidPackage aidPackage in resultStream
         do {
-            aidPackage.aidPackageItems = [];
             aidPackages.push(aidPackage);
         };
         foreach AidPackage aidPackage in aidPackages {
+            aidPackage.aidPackageItems = [];
             stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
                                                                                NEEDID, QUANTITY, TOTALAMOUNT 
                                                                                FROM AID_PACKAGE_ITEM
@@ -131,6 +132,16 @@ service /admin on new http:Listener(9090) {
             do {
                 aidPackage.aidPackageItems.push(aidPackageItem);
             };
+            foreach AidPackageItem? aidPackageItem in aidPackage.aidPackageItems {
+                if aidPackageItem is AidPackageItem {
+                    aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                        QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                        AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                        UNITPRICE, REGULATORYINFO
+                                                                        FROM QUOTATION 
+                                                                        WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+                }
+            }
         }
         check dbClient.close();
         return aidPackages;
@@ -152,6 +163,16 @@ service /admin on new http:Listener(9090) {
         do {
             aidPackage.aidPackageItems.push(aidPackageItem);
         };
+        foreach AidPackageItem? aidPackageItem in aidPackage.aidPackageItems {
+            if aidPackageItem is AidPackageItem {
+                aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                    QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                    AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                    UNITPRICE, REGULATORYINFO
+                                                                    FROM QUOTATION 
+                                                                    WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+            }
+        }
         check dbClient.close();
         return aidPackage;
     }
@@ -186,6 +207,25 @@ service /admin on new http:Listener(9090) {
         if result.lastInsertId is int {
             aidPackage.packageID = <int> result.lastInsertId;
         }
+        stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
+                                                                           NEEDID, QUANTITY, TOTALAMOUNT 
+                                                                           FROM AID_PACKAGE_ITEM
+                                                                           WHERE PACKAGEID=${aidPackage.packageID};`);
+        aidPackage.aidPackageItems = [];
+        check from AidPackageItem aidPackageItem in resultItemStream
+        do {
+            aidPackage.aidPackageItems.push(aidPackageItem);
+        };
+        foreach AidPackageItem? aidPackageItem in aidPackage.aidPackageItems {
+            if aidPackageItem is AidPackageItem {
+                aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                    QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                    AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                    UNITPRICE, REGULATORYINFO
+                                                                    FROM QUOTATION 
+                                                                    WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+            }
+        }
         check dbClient.close();
         return aidPackage;
     }
@@ -202,17 +242,17 @@ service /admin on new http:Listener(9090) {
         sql:ExecutionResult result = check dbClient->execute(query);
         if result.lastInsertId is int {
             aidPackageItem.packageItemID = <int> result.lastInsertId;
-            query = `UPDATE MEDICAL_NEED
-                     SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
-                     WHERE NEEDID=${aidPackageItem.needID};`;
-            _ = check dbClient->execute(query);
-            aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                                UNITPRICE, REGULATORYINFO
-                                                                FROM QUOTATION 
-                                                                WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
         }
+        query = `UPDATE MEDICAL_NEED
+                 SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
+                 WHERE NEEDID=${aidPackageItem.needID};`;
+        _ = check dbClient->execute(query);
+        aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                            QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                            AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                            UNITPRICE, REGULATORYINFO
+                                                            FROM QUOTATION 
+                                                            WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
         check dbClient.close();
         return aidPackageItem;
     }
@@ -231,17 +271,17 @@ service /admin on new http:Listener(9090) {
         sql:ExecutionResult result = check dbClient->execute(query);
         if result.lastInsertId is int {
             aidPackageItem.packageItemID = <int> result.lastInsertId;
-            query = `UPDATE MEDICAL_NEED
-                     SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
-                     WHERE NEEDID=${aidPackageItem.needID};`;
-            _ = check dbClient->execute(query);
-            aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                                UNITPRICE, REGULATORYINFO
-                                                                FROM QUOTATION 
-                                                                WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
         }
+        query = `UPDATE MEDICAL_NEED
+                 SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
+                 WHERE NEEDID=${aidPackageItem.needID};`;
+        _ = check dbClient->execute(query);
+        aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                            QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                            AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                            UNITPRICE, REGULATORYINFO
+                                                            FROM QUOTATION 
+                                                            WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
         check dbClient.close();
         return aidPackageItem;
     }
@@ -274,17 +314,17 @@ service /admin on new http:Listener(9090) {
                                         VALUES (${aidPackageUpdate.packageID},
                                                 IFNULL(${aidPackageUpdate.packageUpdateId}, DEFAULT(PACKAGEUPDATEID)),
                                                 ${aidPackageUpdate.updateComment},
-                                                FROM_UNIXTIME(${aidPackageUpdate.dateTimeUtc[0]})
+                                                FROM_UNIXTIME(${time:utcNow()[0]})
                                         ) ON DUPLICATE KEY UPDATE
-                                        DATETIME=FROM_UNIXTIME(COALESCE(${aidPackageUpdate.dateTimeUtc[0]}, DATETIME)),
+                                        DATETIME=FROM_UNIXTIME(COALESCE(${time:utcNow()[0]}, DATETIME)),
                                         UPDATECOMMENT=COALESCE(${aidPackageUpdate.updateComment}, UPDATECOMMENT);`;
         sql:ExecutionResult result = check dbClient->execute(query);
         if result.lastInsertId is int {
             aidPackageUpdate.packageUpdateId = <int> result.lastInsertId;
-            aidPackageUpdate.dateTime= check dbClient->queryRow( `SELECT DATETIME 
-                                                                  FROM AID_PACKAGAE_UPDATE
-                                                                  WHERE PACKAGEUPDATEID=${aidPackageUpdate.packageUpdateId};`);
         }
+        aidPackageUpdate.dateTime= check dbClient->queryRow( `SELECT DATETIME 
+                                                              FROM AID_PACKAGAE_UPDATE
+                                                              WHERE PACKAGEUPDATEID=${aidPackageUpdate.packageUpdateId};`);
         check dbClient.close();
         return aidPackageUpdate;
     }
