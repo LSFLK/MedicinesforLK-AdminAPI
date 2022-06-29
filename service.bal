@@ -28,13 +28,10 @@ service /admin on new http:Listener(9090) {
                                                         FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M 
                                                         ON B.BENEFICIARYID=M.BENEFICIARYID
                                                         WHERE M.NEEDID=${info.needID};`);
-             stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID, 
-                                                                               BRANDNAME, AVAILABLEQUANTITY, PERIOD,
-                                                                               EXPIRYDATE, UNITPRICE, REGULATORYINFO
-                                                                               FROM QUOTATION Q
-                                                                               WHERE YEAR(Q.PERIOD)=${info.period.year} 
-                                                                               AND MONTH(Q.PERIOD)=${info.period.month}
-                                                                               AND Q.ITEMID=${info.itemID};`);                                                                   
+            stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID,
+                BRANDNAME, AVAILABLEQUANTITY, PERIOD,EXPIRYDATE, UNITPRICE, REGULATORYINFO
+                FROM QUOTATION Q
+                WHERE YEAR(Q.PERIOD)=${info.period.year} AND MONTH(Q.PERIOD)=${info.period.month} AND Q.ITEMID=${info.itemID};`);
             check from Quotation quotation in resultQuotationStream
                 do {
                     info.supplierQuotes.push(quotation);
@@ -85,7 +82,7 @@ service /admin on new http:Listener(9090) {
     resource function post Quotation(@http:Payload Quotation quotation) returns Quotation|error {
         quotation.period.day = 1;
         sql:ParameterizedQuery query = `INSERT INTO QUOTATION(SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD,
-                                                              EXPIRYDATE, UNITPRICE, REGULATORYINFO)
+                                        EXPIRYDATE, UNITPRICE, REGULATORYINFO)
                                         VALUES (${quotation.supplierID}, ${quotation.itemID}, ${quotation.brandName},
                                                 ${quotation.availableQuantity}, ${quotation.period},
                                                 ${quotation.expiryDate}, ${quotation.unitPrice}, ${quotation.regulatoryInfo});`;
@@ -94,7 +91,7 @@ service /admin on new http:Listener(9090) {
             quotation.quotationID = <int>result.lastInsertId;
         }
         quotation.supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER FROM SUPPLIER
-                                                               WHERE SUPPLIERID=${quotation.supplierID}`);
+                                                       WHERE SUPPLIERID=${quotation.supplierID}`);
         return quotation;
     }
 
@@ -235,7 +232,7 @@ service /admin on new http:Listener(9090) {
     # A resource for updating AidPackage-Item
     # + return - AidPackage-Item
     resource function put AidPackage/[int packageID]/AidPackageItem(@http:Payload AidPackageItem aidPackageItem)
-                                                                   returns AidPackageItem|error {
+                                                                    returns AidPackageItem|error {
         aidPackageItem.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
                                         VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
@@ -277,7 +274,7 @@ service /admin on new http:Listener(9090) {
     # A resource for saving update with a comment to an aidPackage
     # + return - aidPackageUpdateId
     resource function put AidPackage/[int packageID]/UpdateComment(@http:Payload AidPackageUpdate aidPackageUpdate)
-                                                                  returns AidPackageUpdate?|error {
+                                                                returns AidPackageUpdate?|error {
         aidPackageUpdate.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGAE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
                                         VALUES (${aidPackageUpdate.packageID},
