@@ -10,7 +10,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for reading all MedicalNeedInfo
     # + return - List of MedicalNeedInfo
-    resource function get medicalNeedInfo() returns MedicalNeedInfo[]|error {
+    resource function get MedicalNeedInfo() returns MedicalNeedInfo[]|error {
         MedicalNeedInfo[] medicalNeedInfo = [];
         stream<MedicalNeedInfo, error?> resultStream = dbClient->query(`SELECT I.NAME, I.ITEMID, NEEDID, PERIOD, URGENCY,
                                                                         NEEDEDQUANTITY, REMAININGQUANTITY
