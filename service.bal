@@ -71,7 +71,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for fetching a Supplier
     # + return - A Supplier
-    resource function get Supplier(int supplierId) returns Supplier|error {
+    resource function get Supplier/[int supplierId]() returns Supplier|error {
         Supplier supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER FROM SUPPLIER
                                                       WHERE SUPPLIERID=${supplierId}`);
         return supplier;
