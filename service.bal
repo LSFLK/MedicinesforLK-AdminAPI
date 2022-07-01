@@ -3,6 +3,7 @@ import ballerinax/mysql;
 import ballerina/sql;
 import ballerina/time;
 import ballerina/io;
+import ballerina/uuid;
 
 # A service representing a network-accessible API
 # bound to port `9090`.
@@ -334,10 +335,16 @@ service /admin on new http:Listener(9090) {
     # A resource for creating AidPackage-Item
     # + return - AidPackage-Item
     resource function post requirements(http:Caller caller,http:Request request) returns error? {
-        stream<byte[], io:Error?> streamer = check request.getByteStream();
-        check io:fileWriteBlocksFromStream("./files/ReceivedFile.pdf", streamer);
-        check streamer.close();
-        check caller->respond("File Received!");
+        stream<byte[], io:Error?> incomingStreamer = check request.getByteStream();
+        string uuid = uuid:createType1AsString();
+        string filePath="./files/"+uuid+".csv";
+        check io:fileWriteBlocksFromStream(filePath, incomingStreamer);
+        check incomingStreamer.close();
+
+        string[][] readCsv = check io:fileReadCsv(filePath);
+        io:println(readCsv);
+
+        check caller->respond("CSV File Received!");
     }
 
 }
