@@ -10,20 +10,16 @@ final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
 # A service representing a network-accessible API bound to port `9090`.
 service /admin on new http:Listener(9090) {
 
-    # A resource for reading all MedicalNeedInfo
-    # + return - List of MedicalNeedInfo
-    resource function get medicalneeds() returns MedicalNeedInfo[]|error {
-        MedicalNeedInfo[] medicalNeedInfo = [];
-        stream<MedicalNeedInfo, error?> resultStream = dbClient->query(`SELECT I.NAME, I.ITEMID, NEEDID, PERIOD, URGENCY,
+    # A resource for reading all MedicalNeed
+    # + return - List of MedicalNeed
+    resource function get medicalneeds() returns MedicalNeed[]|error {
+        MedicalNeed[] medicalNeed = [];
+        stream<MedicalNeed, error?> resultStream = dbClient->query(`SELECT I.ITEMID, NEEDID, PERIOD, URGENCY,
                                                                         NEEDEDQUANTITY, REMAININGQUANTITY
                                                                         FROM MEDICAL_NEED N
                                                                         LEFT JOIN MEDICAL_ITEM I ON I.ITEMID=N.ITEMID;`);
-        check from MedicalNeedInfo info in resultStream
-            do {
-                medicalNeedInfo.push(info);
-            };
-        check resultStream.close();
-        foreach MedicalNeedInfo info in medicalNeedInfo {
+        check from MedicalNeed info in resultStream
+        do {
             info.period.day = 1;
             info.supplierQuotes = [];
             info.beneficiary = check dbClient->queryRow(`SELECT B.BENEFICIARYID, B.NAME, B.SHORTNAME, B.EMAIL, 
@@ -31,23 +27,30 @@ service /admin on new http:Listener(9090) {
                                                         FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M 
                                                         ON B.BENEFICIARYID=M.BENEFICIARYID
                                                         WHERE M.NEEDID=${info.needID};`);
+            info.medicalItem = check dbClient->queryRow(`SELECT ITEMID, NAME, TYPE, UNIT 
+                                                         FROM MEDICAL_ITEM
+                                                         WHERE ITEMID=${info.itemID}`);
+            medicalNeed.push(info);
+        };
+        check resultStream.close();
+        foreach MedicalNeed info in medicalNeed {
             stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID,
-                                                                               BRANDNAME, AVAILABLEQUANTITY, PERIOD,
-                                                                               EXPIRYDATE, UNITPRICE, REGULATORYINFO
-                                                                               FROM QUOTATION Q
-                                                                               WHERE YEAR(Q.PERIOD)=${info.period.year} 
-                                                                               AND MONTH(Q.PERIOD)=${info.period.month} 
-                                                                               AND Q.ITEMID=${info.itemID};`);
+                                                                                BRANDNAME, AVAILABLEQUANTITY, PERIOD,
+                                                                                EXPIRYDATE, UNITPRICE, REGULATORYINFO
+                                                                                FROM QUOTATION Q
+                                                                                WHERE YEAR(Q.PERIOD)=${info.period.year} 
+                                                                                AND MONTH(Q.PERIOD)=${info.period.month} 
+                                                                                AND Q.ITEMID=${info.itemID};`);
             check from Quotation quotation in resultQuotationStream
-                do {
-                    quotation.supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
+            do {
+                quotation.supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
                                                                FROM SUPPLIER
                                                                WHERE SUPPLIERID=${quotation.supplierID}`);
-                    info.supplierQuotes.push(quotation);
-                };
+                info.supplierQuotes.push(quotation);
+            };
             check resultQuotationStream.close();
         }
-        return medicalNeedInfo;
+        return medicalNeed;
     }
 
     # A resource for creating Supplier
@@ -71,9 +74,9 @@ service /admin on new http:Listener(9090) {
         stream<Supplier, error?> resultStream = dbClient->query(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
                                                                  FROM SUPPLIER`);
         check from Supplier supplier in resultStream
-            do {
-                suppliers.push(supplier);
-            };
+        do {
+            suppliers.push(supplier);
+        };
         check resultStream.close();
         return suppliers;
     }
@@ -113,9 +116,9 @@ service /admin on new http:Listener(9090) {
                                                                     FROM AID_PACKAGE
                                                                     WHERE ${status} IS NULL OR STATUS=${status};`);
         check from AidPackage aidPackage in resultStream
-            do {
-                aidPackages.push(aidPackage);
-            };
+        do {
+            aidPackages.push(aidPackage);
+        };
         check resultStream.close();
         foreach AidPackage aidPackage in aidPackages {
             aidPackage.aidPackageItems = [];
@@ -124,15 +127,15 @@ service /admin on new http:Listener(9090) {
                                                                                FROM AID_PACKAGE_ITEM
                                                                                WHERE PACKAGEID=${aidPackage.packageID};`);
             check from AidPackageItem aidPackageItem in resultItemStream
-                do {
-                    aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                        QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                        AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                                        UNITPRICE, REGULATORYINFO
-                                                                        FROM QUOTATION 
-                                                                        WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
-                    aidPackage.aidPackageItems.push(aidPackageItem);
-                };
+            do {
+                aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                    QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                    AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                    UNITPRICE, REGULATORYINFO
+                                                                    FROM QUOTATION 
+                                                                    WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+                aidPackage.aidPackageItems.push(aidPackageItem);
+            };
             check resultItemStream.close();
         }
         return aidPackages;
@@ -149,26 +152,24 @@ service /admin on new http:Listener(9090) {
                                                                            WHERE PACKAGEID=${packageID};`);
         aidPackage.aidPackageItems = [];
         check from AidPackageItem aidPackageItem in resultItemStream
-            do {
-                aidPackage.aidPackageItems.push(aidPackageItem);
-            };
+        do {
+            aidPackage.aidPackageItems.push(aidPackageItem);
+        };
         check resultItemStream.close();
-        foreach AidPackageItem? aidPackageItem in aidPackage.aidPackageItems {
-            if aidPackageItem is AidPackageItem {
-                aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                    QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                    AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                                    UNITPRICE, REGULATORYINFO
-                                                                    FROM QUOTATION 
-                                                                    WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
-            }
+        foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
+            aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                UNITPRICE, REGULATORYINFO
+                                                                FROM QUOTATION 
+                                                                WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
         }
         return aidPackage;
     }
 
     # A resource for creating Aid-Package
     # + return - Aid-Package
-    resource function post aidpackage(@http:Payload AidPackage aidPackage) returns AidPackage|error {
+    resource function post aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS)
                                         VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status});`;
         sql:ExecutionResult result = check dbClient->execute(query);
@@ -181,7 +182,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for modifying Aid-Package
     # + return - Aid-Package
-    resource function patch aidpackage(@http:Payload AidPackage aidPackage) returns AidPackage|error {
+    resource function patch aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
         sql:ParameterizedQuery query = `UPDATE AID_PACKAGE
                                         SET
                                         NAME=COALESCE(${aidPackage.name},NAME), 
@@ -199,22 +200,22 @@ service /admin on new http:Listener(9090) {
                                                                            WHERE PACKAGEID=${aidPackage.packageID};`);
         aidPackage.aidPackageItems = [];
         check from AidPackageItem aidPackageItem in resultItemStream
-            do {
-                aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                    QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                    AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                                    UNITPRICE, REGULATORYINFO
-                                                                    FROM QUOTATION 
-                                                                    WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
-                aidPackage.aidPackageItems.push(aidPackageItem);
-            };
+        do {
+            aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                UNITPRICE, REGULATORYINFO
+                                                                FROM QUOTATION 
+                                                                WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+            aidPackage.aidPackageItems.push(aidPackageItem);
+        };
         check resultItemStream.close();
         return aidPackage;
     }
 
     # A resource for creating AidPackage-Item
     # + return - AidPackage-Item
-    resource function post aidPackage/[int packageID]/aidpackageitem(@http:Payload AidPackageItem aidPackageItem)
+    resource function post aidPackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
         aidPackageItem.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
@@ -241,7 +242,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for updating AidPackage-Item
     # + return - AidPackage-Item
-    resource function put aidpackage/[int packageID]/aidpackageitem(@http:Payload AidPackageItem aidPackageItem)
+    resource function put aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
         aidPackageItem.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
@@ -268,30 +269,41 @@ service /admin on new http:Listener(9090) {
         return aidPackageItem;
     }
 
+    # A resource for removing an AidPackage-Item
+    # + return - aidPackageItem
+    resource function delete aidpackages/[int packageID]/aidpackageitems/[int packageItemID] () returns int|error
+    {
+        sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGE_ITEM 
+                                        WHERE PACKAGEID=${packageID}
+                                        AND PACKAGEITEMID=${packageItemID};`;
+        sql:ExecutionResult _ = check dbClient->execute(query);
+        return packageItemID;
+    }
+
     # A resource for fetching all comments of an Aid-Package
     # + return - list of AidPackageUpdateComments
-    resource function get aidPackage/updatecomments/[int packageID]() returns AidPackageUpdate[]|error {
+    resource function get aidPackages/[int packageID]/updatecomments() returns AidPackageUpdate[]|error {
         AidPackageUpdate[] aidPackageUpdates = [];
         stream<AidPackageUpdate, error?> resultStream = dbClient->query(`SELECT
                                                                          PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME 
-                                                                         FROM AID_PACKAGAE_UPDATE
+                                                                         FROM AID_PACKAGE_UPDATE
                                                                          WHERE PACKAGEID=${packageID};`);
         check from AidPackageUpdate aidPackageUpdate in resultStream
-            do {
-                aidPackageUpdates.push(aidPackageUpdate);
-            };
+        do {
+            aidPackageUpdates.push(aidPackageUpdate);
+        };
         check resultStream.close();
         return aidPackageUpdates;
     }
 
-    # A resource for saving update with a comment to an aidPackage
-    # + return - aidPackageUpdateComment
-    resource function put aidPackage/[int packageID]/updatecomment(@http:Payload AidPackageUpdate aidPackageUpdate)
+    # A resource for saving update with a comment to an Aid-Package
+    # + return - AidPackageUpdateComment
+    resource function put aidPackages/[int packageID]/updatecomments(@http:Payload AidPackageUpdate aidPackageUpdate)
                                                                 returns AidPackageUpdate?|error {
         aidPackageUpdate.packageID = packageID;
-        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGAE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
+        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
                                         VALUES (${aidPackageUpdate.packageID},
-                                                IFNULL(${aidPackageUpdate.packageUpdateId}, DEFAULT(PACKAGEUPDATEID)),
+                                                IFNULL(${aidPackageUpdate.packageUpdateID}, DEFAULT(PACKAGEUPDATEID)),
                                                 ${aidPackageUpdate.updateComment},
                                                 FROM_UNIXTIME(${time:utcNow()[0]})
                                         ) ON DUPLICATE KEY UPDATE
@@ -300,22 +312,111 @@ service /admin on new http:Listener(9090) {
         sql:ExecutionResult result = check dbClient->execute(query);
         var lastInsertedID = result.lastInsertId;
         if lastInsertedID is int {
-            aidPackageUpdate.packageUpdateId = lastInsertedID;
+            aidPackageUpdate.packageUpdateID = lastInsertedID;
         }
         aidPackageUpdate.dateTime = check dbClient->queryRow(`SELECT DATETIME 
-                                                              FROM AID_PACKAGAE_UPDATE
-                                                              WHERE PACKAGEUPDATEID=${aidPackageUpdate.packageUpdateId};`);
+                                                              FROM AID_PACKAGE_UPDATE
+                                                              WHERE PACKAGEUPDATEID=${aidPackageUpdate.packageUpdateID};`);
         return aidPackageUpdate;
     }
 
-    # A resource for removing an update comment from an aidPackage
+    # A resource for removing an update comment from an Aid-Package
     # + return - aidPackageUpdateId
-    resource function delete AidPackage/UpdateComment(int packageUpdateID) returns int|error
+    resource function delete aidPackages/[int packageID]/updatecomment/[int packageUpdateID]() returns int|error
     {
-        sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGAE_UPDATE 
-                                        WHERE PACKAGEUPDATEID=${packageUpdateID};`;
+        sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGE_UPDATE 
+                                        WHERE 
+                                        PACKAGEID=${packageID} AND
+                                        PACKAGEUPDATEID=${packageUpdateID};`;
         sql:ExecutionResult _ = check dbClient->execute(query);
         return packageUpdateID;
+    }
+
+    # A resource for fetching all pledges of an Aid-Package
+    # + return - list of pledges
+    resource function get aidPackage/[int packageID]/pledges() returns Pledge[]|error {
+        Pledge[] pledges = [];
+        stream<Pledge, error?> resultStream = dbClient->query(`SELECT
+                                                               PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
+                                                               FROM PLEDGE
+                                                               WHERE PACKAGEID=${packageID};`);
+        check from Pledge pledge in resultStream
+        do {
+            pledge.donor = check dbClient->queryRow(`SELECT
+                                                        DONORID, ORGNAME, ORGLINK,
+                                                        EMAIL, PHONENUMBER
+                                                        FROM DONOR 
+                                                        WHERE DONORID=${pledge.donorID}`);
+            pledges.push(pledge);
+        };
+        check resultStream.close();
+        return pledges;
+    }
+
+    # A resource for fetching all comments of a pledge
+    # + return - list of PledgeUpdateComments
+    resource function get pledges/[int pledgeID]/updatecomments() returns PledgeUpdate[]|error {
+        PledgeUpdate[] PledgeUpdates = [];
+        stream<PledgeUpdate, error?> resultStream = dbClient->query(`SELECT
+                                                                     PLEDGEID, PLEDGEUPDATEID, UPDATECOMMENT, DATETIME 
+                                                                     FROM PLEDGE_UPDATE
+                                                                     WHERE PLEDGEID=${pledgeID};`);
+        check from PledgeUpdate PledgeUpdate in resultStream
+        do {
+            PledgeUpdates.push(PledgeUpdate);
+        };
+        check resultStream.close();
+        return PledgeUpdates;
+    }
+
+    # A resource for removing a Pldege
+    # + return - pledgeID
+    resource function delete pledges/[int pledgeID]() returns int|error
+    {
+        sql:ParameterizedQuery query = `DELETE FROM PLEDGE_UPDATE 
+                                        WHERE
+                                        PLEDGEID=${pledgeID}`;
+        sql:ExecutionResult _ = check dbClient->execute(query);
+        query = `DELETE FROM PLEDGE 
+                 WHERE
+                 PLEDGEID=${pledgeID};`;
+        sql:ExecutionResult _ = check dbClient->execute(query);
+        return pledgeID;
+    }
+
+    # A resource for saving update with a comment to a Pledge
+    # + return - PledgeUpdateComment
+    resource function put pledges/[int pledgeID]/updatecomment(@http:Payload PledgeUpdate pledgeUpdate) returns PledgeUpdate?|error {
+        pledgeUpdate.pledgeID = pledgeID;
+        sql:ParameterizedQuery query = `INSERT INTO PLEDGE_UPDATE(PLEDGEID, PLEDGEUPDATEID, UPDATECOMMENT, DATETIME)
+                                        VALUES (${pledgeUpdate.pledgeID},
+                                                IFNULL(${pledgeUpdate.pledgeUpdateID}, DEFAULT(PLEDGEUPDATEID)),
+                                                ${pledgeUpdate.updateComment},
+                                                FROM_UNIXTIME(${time:utcNow()[0]})
+                                        ) ON DUPLICATE KEY UPDATE
+                                        DATETIME=FROM_UNIXTIME(COALESCE(${time:utcNow()[0]}, DATETIME)),
+                                        UPDATECOMMENT=COALESCE(${pledgeUpdate.updateComment}, UPDATECOMMENT);`;
+        sql:ExecutionResult result = check dbClient->execute(query);
+        var lastInsertedID = result.lastInsertId;
+        if lastInsertedID is int {
+            pledgeUpdate.pledgeUpdateID = lastInsertedID;
+        }
+        pledgeUpdate.dateTime = check dbClient->queryRow(`SELECT DATETIME 
+                                                          FROM PLEDGE_UPDATE
+                                                          WHERE PLEDGEUPDATEID=${pledgeUpdate.pledgeUpdateID};`);
+        return pledgeUpdate;
+    }
+
+    # A resource for removing an update comment from a Pldege
+    # + return - pledgeUpdateID
+    resource function delete pledges/[int pledgeID]/updatecomment/[int pledgeUpdateID]() returns int|error
+    {
+        sql:ParameterizedQuery query = `DELETE FROM PLEDGE_UPDATE 
+                                        WHERE
+                                        PLEDGEID=${pledgeID} 
+                                        AND PLEDGEUPDATEID=${pledgeUpdateID};`;
+        sql:ExecutionResult _ = check dbClient->execute(query);
+        return pledgeUpdateID;
     }
 
     resource function post requirements(http:Caller caller,http:Request request) returns error? {
