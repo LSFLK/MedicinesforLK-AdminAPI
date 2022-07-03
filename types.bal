@@ -79,7 +79,7 @@ type AidPackageItem record {
 };
 
 type AidPackageUpdate record {
-    int? packageUpdateId = ();
+    int? packageUpdateID = ();
     int? packageID = ();
     string updateComment;
     string? dateTime = ();
@@ -96,7 +96,7 @@ type Pledge record {
 
 type PledgeUpdate record {
     int? pledgeUpdateID = ();
-    int? pledgeID;
+    int? pledgeID = ();
     string updateComment;
     string? dateTime = ();
 };

@@ -303,7 +303,7 @@ service /admin on new http:Listener(9090) {
         aidPackageUpdate.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
                                         VALUES (${aidPackageUpdate.packageID},
-                                                IFNULL(${aidPackageUpdate.packageUpdateId}, DEFAULT(PACKAGEUPDATEID)),
+                                                IFNULL(${aidPackageUpdate.packageUpdateID}, DEFAULT(PACKAGEUPDATEID)),
                                                 ${aidPackageUpdate.updateComment},
                                                 FROM_UNIXTIME(${time:utcNow()[0]})
                                         ) ON DUPLICATE KEY UPDATE
@@ -312,11 +312,11 @@ service /admin on new http:Listener(9090) {
         sql:ExecutionResult result = check dbClient->execute(query);
         var lastInsertedID = result.lastInsertId;
         if lastInsertedID is int {
-            aidPackageUpdate.packageUpdateId = lastInsertedID;
+            aidPackageUpdate.packageUpdateID = lastInsertedID;
         }
         aidPackageUpdate.dateTime = check dbClient->queryRow(`SELECT DATETIME 
                                                               FROM AID_PACKAGE_UPDATE
-                                                              WHERE PACKAGEUPDATEID=${aidPackageUpdate.packageUpdateId};`);
+                                                              WHERE PACKAGEUPDATEID=${aidPackageUpdate.packageUpdateID};`);
         return aidPackageUpdate;
     }
 
@@ -382,8 +382,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for saving update with a comment to a Pledge
     # + return - PledgeUpdateComment
-    resource function put pledges/[int pledgeID]/updatecomment(@http:Payload PledgeUpdate pledgeUpdate)
-                                                                returns PledgeUpdate?|error {
+    resource function put pledges/[int pledgeID]/updatecomment(@http:Payload PledgeUpdate pledgeUpdate) returns PledgeUpdate?|error {
         pledgeUpdate.pledgeID = pledgeID;
         sql:ParameterizedQuery query = `INSERT INTO PLEDGE_UPDATE(PLEDGEID, PLEDGEUPDATEID, UPDATECOMMENT, DATETIME)
                                         VALUES (${pledgeUpdate.pledgeID},
