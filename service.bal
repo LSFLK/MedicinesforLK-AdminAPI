@@ -1,7 +1,9 @@
 import ballerina/http;
+import ballerinax/mysql;
 import ballerina/sql;
 import ballerina/time;
-import ballerinax/mysql;
+import ballerina/io;
+import ballerina/uuid;
 
 final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -30,19 +32,20 @@ service /admin on new http:Listener(9090) {
                                                         ON B.BENEFICIARYID=M.BENEFICIARYID
                                                         WHERE M.NEEDID=${info.needID};`);
             stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID,
-                BRANDNAME, AVAILABLEQUANTITY, PERIOD,EXPIRYDATE, UNITPRICE, REGULATORYINFO
-                FROM QUOTATION Q
-                WHERE YEAR(Q.PERIOD)=${info.period.year} AND MONTH(Q.PERIOD)=${info.period.month} AND Q.ITEMID=${info.itemID};`);
+                                                                               BRANDNAME, AVAILABLEQUANTITY, PERIOD,
+                                                                               EXPIRYDATE, UNITPRICE, REGULATORYINFO
+                                                                               FROM QUOTATION Q
+                                                                               WHERE YEAR(Q.PERIOD)=${info.period.year} 
+                                                                               AND MONTH(Q.PERIOD)=${info.period.month} 
+                                                                               AND Q.ITEMID=${info.itemID};`);
             check from Quotation quotation in resultQuotationStream
                 do {
+                    quotation.supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
+                                                               FROM SUPPLIER
+                                                               WHERE SUPPLIERID=${quotation.supplierID}`);
                     info.supplierQuotes.push(quotation);
                 };
             check resultQuotationStream.close();
-            foreach Quotation quotation in info.supplierQuotes {
-                quotation.supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
-                                                               FROM SUPPLIER
-                                                               WHERE SUPPLIERID=${quotation.supplierID}`);
-            }
         }
         return medicalNeedInfo;
     }
@@ -122,19 +125,15 @@ service /admin on new http:Listener(9090) {
                                                                                WHERE PACKAGEID=${aidPackage.packageID};`);
             check from AidPackageItem aidPackageItem in resultItemStream
                 do {
-                    aidPackage.aidPackageItems.push(aidPackageItem);
-                };
-            check resultItemStream.close();
-            foreach AidPackageItem? aidPackageItem in aidPackage.aidPackageItems {
-                if aidPackageItem is AidPackageItem {
                     aidPackageItem.quotation = check dbClient->queryRow(`SELECT
                                                                         QUOTATIONID, SUPPLIERID, BRANDNAME,
                                                                         AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
                                                                         UNITPRICE, REGULATORYINFO
                                                                         FROM QUOTATION 
                                                                         WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
-                }
-            }
+                    aidPackage.aidPackageItems.push(aidPackageItem);
+                };
+            check resultItemStream.close();
         }
         return aidPackages;
     }
@@ -201,19 +200,15 @@ service /admin on new http:Listener(9090) {
         aidPackage.aidPackageItems = [];
         check from AidPackageItem aidPackageItem in resultItemStream
             do {
-                aidPackage.aidPackageItems.push(aidPackageItem);
-            };
-        check resultItemStream.close();
-        foreach AidPackageItem? aidPackageItem in aidPackage.aidPackageItems {
-            if aidPackageItem is AidPackageItem {
                 aidPackageItem.quotation = check dbClient->queryRow(`SELECT
                                                                     QUOTATIONID, SUPPLIERID, BRANDNAME,
                                                                     AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
                                                                     UNITPRICE, REGULATORYINFO
                                                                     FROM QUOTATION 
                                                                     WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
-            }
-        }
+                aidPackage.aidPackageItems.push(aidPackageItem);
+            };
+        check resultItemStream.close();
         return aidPackage;
     }
 
@@ -231,7 +226,8 @@ service /admin on new http:Listener(9090) {
             aidPackageItem.packageItemID = lastInsertedID;
         }
         query = `UPDATE MEDICAL_NEED
-                 SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
+                 SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM 
+                     AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
                  WHERE NEEDID=${aidPackageItem.needID};`;
         _ = check dbClient->execute(query);
         aidPackageItem.quotation = check dbClient->queryRow(`SELECT
@@ -259,7 +255,8 @@ service /admin on new http:Listener(9090) {
             aidPackageItem.packageItemID = lastInsertedID;
         }
         query = `UPDATE MEDICAL_NEED
-                 SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
+                 SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM 
+                     AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
                  WHERE NEEDID=${aidPackageItem.needID};`;
         _ = check dbClient->execute(query);
         aidPackageItem.quotation = check dbClient->queryRow(`SELECT
@@ -276,9 +273,9 @@ service /admin on new http:Listener(9090) {
     resource function get aidPackage/updatecomments/[int packageID]() returns AidPackageUpdate[]|error {
         AidPackageUpdate[] aidPackageUpdates = [];
         stream<AidPackageUpdate, error?> resultStream = dbClient->query(`SELECT
-                                                PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME 
-                                                FROM AID_PACKAGAE_UPDATE
-                                                WHERE PACKAGEID=${packageID};`);
+                                                                         PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME 
+                                                                         FROM AID_PACKAGAE_UPDATE
+                                                                         WHERE PACKAGEID=${packageID};`);
         check from AidPackageUpdate aidPackageUpdate in resultStream
             do {
                 aidPackageUpdates.push(aidPackageUpdate);
@@ -288,7 +285,7 @@ service /admin on new http:Listener(9090) {
     }
 
     # A resource for saving update with a comment to an aidPackage
-    # + return - aidPackageUpdateId
+    # + return - aidPackageUpdateComment
     resource function put aidPackage/[int packageID]/updatecomment(@http:Payload AidPackageUpdate aidPackageUpdate)
                                                                 returns AidPackageUpdate?|error {
         aidPackageUpdate.packageID = packageID;
@@ -309,5 +306,28 @@ service /admin on new http:Listener(9090) {
                                                               FROM AID_PACKAGAE_UPDATE
                                                               WHERE PACKAGEUPDATEID=${aidPackageUpdate.packageUpdateId};`);
         return aidPackageUpdate;
+    }
+
+    # A resource for removing an update comment from an aidPackage
+    # + return - aidPackageUpdateId
+    resource function delete AidPackage/UpdateComment(int packageUpdateID) returns int|error
+    {
+        sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGAE_UPDATE 
+                                        WHERE PACKAGEUPDATEID=${packageUpdateID};`;
+        sql:ExecutionResult _ = check dbClient->execute(query);
+        return packageUpdateID;
+    }
+
+    resource function post requirements(http:Caller caller,http:Request request) returns error? {
+        stream<byte[], io:Error?> incomingStreamer = check request.getByteStream();
+        string uuid = uuid:createType1AsString();
+        string filePath="./files/"+uuid+".csv";
+        check io:fileWriteBlocksFromStream(filePath, incomingStreamer);
+        check incomingStreamer.close();
+
+        string[][] readCsv = check io:fileReadCsv(filePath);
+        io:println(readCsv);
+
+        check caller->respond("CSV File Received!");
     }
 }
