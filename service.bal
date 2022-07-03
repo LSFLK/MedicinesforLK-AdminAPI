@@ -270,10 +270,11 @@ service /admin on new http:Listener(9090) {
 
     # A resource for removing an AidPackage-Item
     # + return - aidPackageItem
-    resource function delete aidpackageitems/[int packageItemID] () returns int|error
+    resource function delete aidpackages/[int packageID]/aidpackageitems/[int packageItemID] () returns int|error
     {
-        sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGAE_ITEM 
-                                        WHERE PACKAGEITEMID=${packageItemID};`;
+        sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGE_ITEM 
+                                        WHERE PACKAGEID=${packageID}
+                                        AND PACKAGEITEMID=${packageItemID};`;
         sql:ExecutionResult _ = check dbClient->execute(query);
         return packageItemID;
     }
