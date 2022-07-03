@@ -5,7 +5,6 @@ import ballerina/mime;
 import ballerina/regex;
 import ballerina/sql;
 import ballerina/time;
-import ballerina/uuid;
 import ballerinax/mysql;
 
 final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
@@ -319,19 +318,6 @@ service /admin on new http:Listener(9090) {
                                         WHERE PACKAGEUPDATEID=${packageUpdateID};`;
         sql:ExecutionResult _ = check dbClient->execute(query);
         return packageUpdateID;
-    }
-
-    resource function post requirements(http:Caller caller,http:Request request) returns error? {
-        stream<byte[], io:Error?> incomingStreamer = check request.getByteStream();
-        string uuid = uuid:createType1AsString();
-        string filePath="./files/"+uuid+".csv";
-        check io:fileWriteBlocksFromStream(filePath, incomingStreamer);
-        check incomingStreamer.close();
-
-        string[][] readCsv = check io:fileReadCsv(filePath);
-        io:println(readCsv);
-
-        check caller->respond("CSV File Received!");
     }
 
     resource function post requirements/medicalneeds(http:Request request) returns http:Response|error {
