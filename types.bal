@@ -94,10 +94,11 @@ type Pledge record {
     int donorID;
     decimal amount;
     string status;
+    Donor? donor;
 };
 
 type PledgeUpdate record {
-    int? pledgeUpdateId = ();
+    int? pledgeUpdateID = ();
     int? pledgeID = ();
     string updateComment;
     string? dateTime = ();

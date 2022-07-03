@@ -168,7 +168,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for creating Aid-Package
     # + return - Aid-Package
-    resource function post aidpackage(@http:Payload AidPackage aidPackage) returns AidPackage|error {
+    resource function post aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS)
                                         VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status});`;
         sql:ExecutionResult result = check dbClient->execute(query);
@@ -181,7 +181,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for modifying Aid-Package
     # + return - Aid-Package
-    resource function patch aidpackage(@http:Payload AidPackage aidPackage) returns AidPackage|error {
+    resource function patch aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
         sql:ParameterizedQuery query = `UPDATE AID_PACKAGE
                                         SET
                                         NAME=COALESCE(${aidPackage.name},NAME), 
@@ -214,7 +214,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for creating AidPackage-Item
     # + return - AidPackage-Item
-    resource function post aidPackage/[int packageID]/aidpackageitem(@http:Payload AidPackageItem aidPackageItem)
+    resource function post aidPackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
         aidPackageItem.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
@@ -241,7 +241,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for updating AidPackage-Item
     # + return - AidPackage-Item
-    resource function put aidpackage/[int packageID]/aidpackageitem(@http:Payload AidPackageItem aidPackageItem)
+    resource function put aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
         aidPackageItem.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
@@ -268,9 +268,19 @@ service /admin on new http:Listener(9090) {
         return aidPackageItem;
     }
 
+    # A resource for removing an AidPackage-Item
+    # + return - aidPackageItem
+    resource function delete aidpackageitems/[int packageItemID] () returns int|error
+    {
+        sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGAE_ITEM 
+                                        WHERE PACKAGEITEMID=${packageItemID};`;
+        sql:ExecutionResult _ = check dbClient->execute(query);
+        return packageItemID;
+    }
+
     # A resource for fetching all comments of an Aid-Package
     # + return - list of AidPackageUpdateComments
-    resource function get aidPackage/updatecomments/[int packageID]() returns AidPackageUpdate[]|error {
+    resource function get aidPackages/[int packageID]/updatecomments() returns AidPackageUpdate[]|error {
         AidPackageUpdate[] aidPackageUpdates = [];
         stream<AidPackageUpdate, error?> resultStream = dbClient->query(`SELECT
                                                                          PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME 
@@ -284,9 +294,9 @@ service /admin on new http:Listener(9090) {
         return aidPackageUpdates;
     }
 
-    # A resource for saving update with a comment to an aidPackage
-    # + return - aidPackageUpdateComment
-    resource function put aidPackage/[int packageID]/updatecomment(@http:Payload AidPackageUpdate aidPackageUpdate)
+    # A resource for saving update with a comment to an Aid-Package
+    # + return - AidPackageUpdateComment
+    resource function put aidPackages/[int packageID]/updatecomments(@http:Payload AidPackageUpdate aidPackageUpdate)
                                                                 returns AidPackageUpdate?|error {
         aidPackageUpdate.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGAE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
@@ -308,14 +318,100 @@ service /admin on new http:Listener(9090) {
         return aidPackageUpdate;
     }
 
-    # A resource for removing an update comment from an aidPackage
+    # A resource for removing an update comment from an Aid-Package
     # + return - aidPackageUpdateId
-    resource function delete AidPackage/UpdateComment(int packageUpdateID) returns int|error
+    resource function delete aidPackages/[int packageID]/updatecomment/[int packageUpdateID]() returns int|error
     {
         sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGAE_UPDATE 
-                                        WHERE PACKAGEUPDATEID=${packageUpdateID};`;
+                                        WHERE 
+                                        PACKAGEID=${packageID} AND
+                                        PACKAGEUPDATEID=${packageUpdateID};`;
         sql:ExecutionResult _ = check dbClient->execute(query);
         return packageUpdateID;
+    }
+
+    # A resource for fetching all pledges of an Aid-Package
+    # + return - list of pledges
+    resource function get aidPackage/[int packageID]/pledges() returns Pledge[]|error {
+        Pledge[] pledges = [];
+        stream<Pledge, error?> resultStream = dbClient->query(`SELECT
+                                                               PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
+                                                               FROM PLEDGE
+                                                               WHERE PACKAGEID=${packageID};`);
+        check from Pledge pledge in resultStream
+            do {
+                pledge.donor = check dbClient->queryRow(`SELECT
+                                                         DONORID, ORGNAME, ORGLINK,
+                                                         EMAIL, PHONENUMBER
+                                                         FROM DONOR 
+                                                         WHERE DONORID=${pledge.donorID}`);
+                pledges.push(pledge);
+            };
+        check resultStream.close();
+        return pledges;
+    }
+
+    # A resource for fetching all comments of a pledge
+    # + return - list of PledgeUpdateComments
+    resource function get pledges/[int pledgeID]/updatecomments() returns PledgeUpdate[]|error {
+        PledgeUpdate[] PledgeUpdates = [];
+        stream<PledgeUpdate, error?> resultStream = dbClient->query(`SELECT
+                                                                     PLEDGEID, PLEDGEUPDATEID, UPDATECOMMENT, DATETIME 
+                                                                     FROM PLEDGE_UPDATE
+                                                                     WHERE PLEDGEID=${pledgeID};`);
+        check from PledgeUpdate PledgeUpdate in resultStream
+            do {
+                PledgeUpdates.push(PledgeUpdate);
+            };
+        check resultStream.close();
+        return PledgeUpdates;
+    }
+
+    # A resource for removing a Pldege
+    # + return - pledgeID
+    resource function delete pledges/[int pledgeID]() returns int|error
+    {
+        sql:ParameterizedQuery query = `DELETE FROM PLEDGE 
+                                        WHERE
+                                        PLEDGEID=${pledgeID};`;
+        sql:ExecutionResult _ = check dbClient->execute(query);
+        return pledgeID;
+    }
+
+    # A resource for saving update with a comment to a Pledge
+    # + return - PledgeUpdateComment
+    resource function put pledges/[int pledgeID]/updatecomment(@http:Payload PledgeUpdate pledgeUpdate)
+                                                                returns PledgeUpdate?|error {
+        pledgeUpdate.pledgeID = pledgeID;
+        sql:ParameterizedQuery query = `INSERT INTO PLEDGE_UPDATE(PLEDGEID, PLEDGEUPDATEID, UPDATECOMMENT, DATETIME)
+                                        VALUES (${pledgeUpdate.pledgeID},
+                                                IFNULL(${pledgeUpdate.pledgeUpdateID}, DEFAULT(PLEDGEUPDATEID)),
+                                                ${pledgeUpdate.updateComment},
+                                                FROM_UNIXTIME(${time:utcNow()[0]})
+                                        ) ON DUPLICATE KEY UPDATE
+                                        DATETIME=FROM_UNIXTIME(COALESCE(${time:utcNow()[0]}, DATETIME)),
+                                        UPDATECOMMENT=COALESCE(${pledgeUpdate.updateComment}, UPDATECOMMENT);`;
+        sql:ExecutionResult result = check dbClient->execute(query);
+        var lastInsertedID = result.lastInsertId;
+        if lastInsertedID is int {
+            pledgeUpdate.pledgeUpdateID = lastInsertedID;
+        }
+        pledgeUpdate.dateTime = check dbClient->queryRow(`SELECT DATETIME 
+                                                          FROM PLEDGE_UPDATE
+                                                          WHERE PLEDGEUPDATEID=${pledgeUpdate.pledgeUpdateID};`);
+        return pledgeUpdate;
+    }
+
+    # A resource for removing an update comment from a Pldege
+    # + return - pledgeUpdateID
+    resource function delete pledges/[int pledgeID]/updatecomment/[int pledgeUpdateID]() returns int|error
+    {
+        sql:ParameterizedQuery query = `DELETE FROM PLEDGE_UPDATE 
+                                        WHERE
+                                        PLEDGEID=${pledgeID} 
+                                        AND PLEDGEUPDATEID=${pledgeUpdateID};`;
+        sql:ExecutionResult _ = check dbClient->execute(query);
+        return pledgeUpdateID;
     }
 
     resource function post requirements(http:Caller caller,http:Request request) returns error? {
