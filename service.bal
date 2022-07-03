@@ -10,20 +10,16 @@ final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
 # A service representing a network-accessible API bound to port `9090`.
 service /admin on new http:Listener(9090) {
 
-    # A resource for reading all MedicalNeedInfo
-    # + return - List of MedicalNeedInfo
-    resource function get medicalneeds() returns MedicalNeedInfo[]|error {
-        MedicalNeedInfo[] medicalNeedInfo = [];
-        stream<MedicalNeedInfo, error?> resultStream = dbClient->query(`SELECT I.NAME, I.ITEMID, NEEDID, PERIOD, URGENCY,
+    # A resource for reading all MedicalNeed
+    # + return - List of MedicalNeed
+    resource function get medicalneeds() returns MedicalNeed[]|error {
+        MedicalNeed[] medicalNeed = [];
+        stream<MedicalNeed, error?> resultStream = dbClient->query(`SELECT I.NAME, I.ITEMID, NEEDID, PERIOD, URGENCY,
                                                                         NEEDEDQUANTITY, REMAININGQUANTITY
                                                                         FROM MEDICAL_NEED N
                                                                         LEFT JOIN MEDICAL_ITEM I ON I.ITEMID=N.ITEMID;`);
-        check from MedicalNeedInfo info in resultStream
-            do {
-                medicalNeedInfo.push(info);
-            };
-        check resultStream.close();
-        foreach MedicalNeedInfo info in medicalNeedInfo {
+        check from MedicalNeed info in resultStream
+        do {
             info.period.day = 1;
             info.supplierQuotes = [];
             info.beneficiary = check dbClient->queryRow(`SELECT B.BENEFICIARYID, B.NAME, B.SHORTNAME, B.EMAIL, 
@@ -31,23 +27,30 @@ service /admin on new http:Listener(9090) {
                                                         FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M 
                                                         ON B.BENEFICIARYID=M.BENEFICIARYID
                                                         WHERE M.NEEDID=${info.needID};`);
+            medicalNeed.push(info);
+        };
+        check resultStream.close();
+        foreach MedicalNeed info in medicalNeed {
             stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID,
-                                                                               BRANDNAME, AVAILABLEQUANTITY, PERIOD,
-                                                                               EXPIRYDATE, UNITPRICE, REGULATORYINFO
-                                                                               FROM QUOTATION Q
-                                                                               WHERE YEAR(Q.PERIOD)=${info.period.year} 
-                                                                               AND MONTH(Q.PERIOD)=${info.period.month} 
-                                                                               AND Q.ITEMID=${info.itemID};`);
+                                                                                BRANDNAME, AVAILABLEQUANTITY, PERIOD,
+                                                                                EXPIRYDATE, UNITPRICE, REGULATORYINFO
+                                                                                FROM QUOTATION Q
+                                                                                WHERE YEAR(Q.PERIOD)=${info.period.year} 
+                                                                                AND MONTH(Q.PERIOD)=${info.period.month} 
+                                                                                AND Q.ITEMID=${info.itemID};`);
             check from Quotation quotation in resultQuotationStream
-                do {
-                    quotation.supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
+            do {
+                quotation.supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
                                                                FROM SUPPLIER
                                                                WHERE SUPPLIERID=${quotation.supplierID}`);
-                    info.supplierQuotes.push(quotation);
-                };
+                quotation.medicalItem = check dbClient->queryRow(`SELECT ITEMID, NAME, TYPE, UNIT 
+                                                                  FROM MEDICAL_ITEM
+                                                                  WHERE ITEMID=${info.itemID}`);
+                info.supplierQuotes.push(quotation);
+            };
             check resultQuotationStream.close();
         }
-        return medicalNeedInfo;
+        return medicalNeed;
     }
 
     # A resource for creating Supplier
@@ -71,9 +74,9 @@ service /admin on new http:Listener(9090) {
         stream<Supplier, error?> resultStream = dbClient->query(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
                                                                  FROM SUPPLIER`);
         check from Supplier supplier in resultStream
-            do {
-                suppliers.push(supplier);
-            };
+        do {
+            suppliers.push(supplier);
+        };
         check resultStream.close();
         return suppliers;
     }
@@ -113,9 +116,9 @@ service /admin on new http:Listener(9090) {
                                                                     FROM AID_PACKAGE
                                                                     WHERE ${status} IS NULL OR STATUS=${status};`);
         check from AidPackage aidPackage in resultStream
-            do {
-                aidPackages.push(aidPackage);
-            };
+        do {
+            aidPackages.push(aidPackage);
+        };
         check resultStream.close();
         foreach AidPackage aidPackage in aidPackages {
             aidPackage.aidPackageItems = [];
@@ -124,15 +127,15 @@ service /admin on new http:Listener(9090) {
                                                                                FROM AID_PACKAGE_ITEM
                                                                                WHERE PACKAGEID=${aidPackage.packageID};`);
             check from AidPackageItem aidPackageItem in resultItemStream
-                do {
-                    aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                        QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                        AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                                        UNITPRICE, REGULATORYINFO
-                                                                        FROM QUOTATION 
-                                                                        WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
-                    aidPackage.aidPackageItems.push(aidPackageItem);
-                };
+            do {
+                aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                    QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                    AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                    UNITPRICE, REGULATORYINFO
+                                                                    FROM QUOTATION 
+                                                                    WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+                aidPackage.aidPackageItems.push(aidPackageItem);
+            };
             check resultItemStream.close();
         }
         return aidPackages;
@@ -149,19 +152,17 @@ service /admin on new http:Listener(9090) {
                                                                            WHERE PACKAGEID=${packageID};`);
         aidPackage.aidPackageItems = [];
         check from AidPackageItem aidPackageItem in resultItemStream
-            do {
-                aidPackage.aidPackageItems.push(aidPackageItem);
-            };
+        do {
+            aidPackage.aidPackageItems.push(aidPackageItem);
+        };
         check resultItemStream.close();
-        foreach AidPackageItem? aidPackageItem in aidPackage.aidPackageItems {
-            if aidPackageItem is AidPackageItem {
-                aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                    QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                    AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                                    UNITPRICE, REGULATORYINFO
-                                                                    FROM QUOTATION 
-                                                                    WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
-            }
+        foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
+            aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                UNITPRICE, REGULATORYINFO
+                                                                FROM QUOTATION 
+                                                                WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
         }
         return aidPackage;
     }
@@ -169,6 +170,7 @@ service /admin on new http:Listener(9090) {
     # A resource for creating Aid-Package
     # + return - Aid-Package
     resource function post aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
+        aidPackage.status = "Draft";
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS)
                                         VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status});`;
         sql:ExecutionResult result = check dbClient->execute(query);
@@ -199,15 +201,15 @@ service /admin on new http:Listener(9090) {
                                                                            WHERE PACKAGEID=${aidPackage.packageID};`);
         aidPackage.aidPackageItems = [];
         check from AidPackageItem aidPackageItem in resultItemStream
-            do {
-                aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                    QUOTATIONID, SUPPLIERID, BRANDNAME,
-                                                                    AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                                    UNITPRICE, REGULATORYINFO
-                                                                    FROM QUOTATION 
-                                                                    WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
-                aidPackage.aidPackageItems.push(aidPackageItem);
-            };
+        do {
+            aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                                QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                UNITPRICE, REGULATORYINFO
+                                                                FROM QUOTATION 
+                                                                WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+            aidPackage.aidPackageItems.push(aidPackageItem);
+        };
         check resultItemStream.close();
         return aidPackage;
     }
@@ -288,9 +290,9 @@ service /admin on new http:Listener(9090) {
                                                                          FROM AID_PACKAGE_UPDATE
                                                                          WHERE PACKAGEID=${packageID};`);
         check from AidPackageUpdate aidPackageUpdate in resultStream
-            do {
-                aidPackageUpdates.push(aidPackageUpdate);
-            };
+        do {
+            aidPackageUpdates.push(aidPackageUpdate);
+        };
         check resultStream.close();
         return aidPackageUpdates;
     }
@@ -340,14 +342,14 @@ service /admin on new http:Listener(9090) {
                                                                FROM PLEDGE
                                                                WHERE PACKAGEID=${packageID};`);
         check from Pledge pledge in resultStream
-            do {
-                pledge.donor = check dbClient->queryRow(`SELECT
-                                                         DONORID, ORGNAME, ORGLINK,
-                                                         EMAIL, PHONENUMBER
-                                                         FROM DONOR 
-                                                         WHERE DONORID=${pledge.donorID}`);
-                pledges.push(pledge);
-            };
+        do {
+            pledge.donor = check dbClient->queryRow(`SELECT
+                                                        DONORID, ORGNAME, ORGLINK,
+                                                        EMAIL, PHONENUMBER
+                                                        FROM DONOR 
+                                                        WHERE DONORID=${pledge.donorID}`);
+            pledges.push(pledge);
+        };
         check resultStream.close();
         return pledges;
     }
@@ -361,9 +363,9 @@ service /admin on new http:Listener(9090) {
                                                                      FROM PLEDGE_UPDATE
                                                                      WHERE PLEDGEID=${pledgeID};`);
         check from PledgeUpdate PledgeUpdate in resultStream
-            do {
-                PledgeUpdates.push(PledgeUpdate);
-            };
+        do {
+            PledgeUpdates.push(PledgeUpdate);
+        };
         check resultStream.close();
         return PledgeUpdates;
     }
