@@ -373,9 +373,13 @@ service /admin on new http:Listener(9090) {
     # + return - pledgeID
     resource function delete pledges/[int pledgeID]() returns int|error
     {
-        sql:ParameterizedQuery query = `DELETE FROM PLEDGE 
+        sql:ParameterizedQuery query = `DELETE FROM PLEDGE_UPDATE 
                                         WHERE
-                                        PLEDGEID=${pledgeID};`;
+                                        PLEDGEID=${pledgeID}`;
+        sql:ExecutionResult _ = check dbClient->execute(query);
+        query = `DELETE FROM PLEDGE 
+                 WHERE
+                 PLEDGEID=${pledgeID};`;
         sql:ExecutionResult _ = check dbClient->execute(query);
         return pledgeID;
     }
