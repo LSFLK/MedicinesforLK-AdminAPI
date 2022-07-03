@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS PLEDGE (
              PLEDGEID INT NOT NULL AUTO_INCREMENT,
              PACKAGEID INT NOT NULL,
              DONORID INT NOT NULL,
+             AMOUNT DECIMAL(15, 2) NOT NULL DEFAULT 0,
              `STATUS` ENUM('Pledged', 'Payment Initiated', 'Payment Confirmed'),
              PRIMARY KEY (PACKAGEID, DONORID),
              UNIQUE(PLEDGEID),
