@@ -43,7 +43,7 @@ type MedicalNeed record {
     int remainingQuantity;
     Beneficiary? beneficiary = ();
     Quotation[] supplierQuotes = [];
-    MedicalItem[] medicalItem = [];
+    MedicalItem? medicalItem = ();
 };
 
 type Quotation record {

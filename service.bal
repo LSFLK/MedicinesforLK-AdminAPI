@@ -27,6 +27,9 @@ service /admin on new http:Listener(9090) {
                                                         FROM BENEFICIARY B RIGHT JOIN MEDICAL_NEED M 
                                                         ON B.BENEFICIARYID=M.BENEFICIARYID
                                                         WHERE M.NEEDID=${info.needID};`);
+            info.medicalItem = check dbClient->queryRow(`SELECT ITEMID, NAME, TYPE, UNIT 
+                                                         FROM MEDICAL_ITEM
+                                                         WHERE ITEMID=${info.itemID}`);
             medicalNeed.push(info);
         };
         check resultStream.close();
@@ -43,9 +46,6 @@ service /admin on new http:Listener(9090) {
                 quotation.supplier = check dbClient->queryRow(`SELECT SUPPLIERID, NAME, SHORTNAME, EMAIL, PHONENUMBER 
                                                                FROM SUPPLIER
                                                                WHERE SUPPLIERID=${quotation.supplierID}`);
-                quotation.medicalItem = check dbClient->queryRow(`SELECT ITEMID, NAME, TYPE, UNIT 
-                                                                  FROM MEDICAL_ITEM
-                                                                  WHERE ITEMID=${info.itemID}`);
                 info.supplierQuotes.push(quotation);
             };
             check resultQuotationStream.close();
