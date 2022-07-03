@@ -14,7 +14,7 @@ service /admin on new http:Listener(9090) {
     # + return - List of MedicalNeed
     resource function get medicalneeds() returns MedicalNeed[]|error {
         MedicalNeed[] medicalNeed = [];
-        stream<MedicalNeed, error?> resultStream = dbClient->query(`SELECT I.NAME, I.ITEMID, NEEDID, PERIOD, URGENCY,
+        stream<MedicalNeed, error?> resultStream = dbClient->query(`SELECT I.ITEMID, NEEDID, PERIOD, URGENCY,
                                                                         NEEDEDQUANTITY, REMAININGQUANTITY
                                                                         FROM MEDICAL_NEED N
                                                                         LEFT JOIN MEDICAL_ITEM I ON I.ITEMID=N.ITEMID;`);
