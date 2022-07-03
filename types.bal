@@ -2,7 +2,7 @@ import ballerina/time;
 
 // Stakeholders
 type Supplier record {
-    int supplierID = -1;
+    int? supplierID = ();
     string name;
     string shortName;
     string email;
@@ -27,7 +27,7 @@ type Donor record {
 
 // Main Types
 type MedicalItem record {
-    int itemID = -1;
+    int itemID;
     string name;
     string 'type;
     string unit;
@@ -80,7 +80,7 @@ type AidPackageItem record {
 
 type AidPackageUpdate record {
     int? packageUpdateId = ();
-    int packageID;
+    int? packageID = ();
     string updateComment;
     string? dateTime = ();
 };
@@ -96,7 +96,7 @@ type Pledge record {
 
 type PledgeUpdate record {
     int? pledgeUpdateID = ();
-    int pledgeID;
+    int? pledgeID;
     string updateComment;
     string? dateTime = ();
 };
