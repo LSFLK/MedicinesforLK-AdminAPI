@@ -310,17 +310,14 @@ service /admin on new http:Listener(9090) {
 
     # A resource for removing an update comment from an aidPackage
     # + return - aidPackageUpdateId
-    resource function delete AidPackage/[int packageID]/UpdateComment(int packageUpdateID) returns int|error
+    resource function delete AidPackage/UpdateComment(int packageUpdateID) returns int|error
     {
         sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGAE_UPDATE 
-                                        WHERE PACKAGE_ID=${packageID} 
-                                        AND PACKAGEUPDATEID=${packageUpdateID};`;
+                                        WHERE PACKAGEUPDATEID=${packageUpdateID};`;
         sql:ExecutionResult _ = check dbClient->execute(query);
         return packageUpdateID;
     }
 
-    # A resource for creating AidPackage-Item
-    # + return - AidPackage-Item
     resource function post requirements(http:Caller caller,http:Request request) returns error? {
         stream<byte[], io:Error?> incomingStreamer = check request.getByteStream();
         string uuid = uuid:createType1AsString();
