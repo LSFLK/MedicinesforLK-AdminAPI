@@ -284,7 +284,7 @@ service /admin on new http:Listener(9090) {
         AidPackageUpdate[] aidPackageUpdates = [];
         stream<AidPackageUpdate, error?> resultStream = dbClient->query(`SELECT
                                                                          PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME 
-                                                                         FROM AID_PACKAGAE_UPDATE
+                                                                         FROM AID_PACKAGE_UPDATE
                                                                          WHERE PACKAGEID=${packageID};`);
         check from AidPackageUpdate aidPackageUpdate in resultStream
             do {
@@ -299,7 +299,7 @@ service /admin on new http:Listener(9090) {
     resource function put aidPackages/[int packageID]/updatecomments(@http:Payload AidPackageUpdate aidPackageUpdate)
                                                                 returns AidPackageUpdate?|error {
         aidPackageUpdate.packageID = packageID;
-        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGAE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
+        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
                                         VALUES (${aidPackageUpdate.packageID},
                                                 IFNULL(${aidPackageUpdate.packageUpdateId}, DEFAULT(PACKAGEUPDATEID)),
                                                 ${aidPackageUpdate.updateComment},
@@ -313,7 +313,7 @@ service /admin on new http:Listener(9090) {
             aidPackageUpdate.packageUpdateId = lastInsertedID;
         }
         aidPackageUpdate.dateTime = check dbClient->queryRow(`SELECT DATETIME 
-                                                              FROM AID_PACKAGAE_UPDATE
+                                                              FROM AID_PACKAGE_UPDATE
                                                               WHERE PACKAGEUPDATEID=${aidPackageUpdate.packageUpdateId};`);
         return aidPackageUpdate;
     }
@@ -322,7 +322,7 @@ service /admin on new http:Listener(9090) {
     # + return - aidPackageUpdateId
     resource function delete aidPackages/[int packageID]/updatecomment/[int packageUpdateID]() returns int|error
     {
-        sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGAE_UPDATE 
+        sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGE_UPDATE 
                                         WHERE 
                                         PACKAGEID=${packageID} AND
                                         PACKAGEUPDATEID=${packageUpdateID};`;
