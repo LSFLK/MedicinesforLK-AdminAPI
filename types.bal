@@ -2,7 +2,7 @@ import ballerina/time;
 
 // Stakeholders
 type Supplier record {
-    int supplierID = -1;
+    int? supplierID = ();
     string name;
     string shortName;
     string email;
@@ -18,7 +18,7 @@ type Beneficiary record {
 };
 
 type Donor record {
-    int? donarID = ();
+    int? donorID = ();
     string orgName;
     string orgLink;
     string email;
@@ -27,16 +27,10 @@ type Donor record {
 
 // Main Types
 type MedicalItem record {
-    int? itemID = ();
+    int itemID;
     string name;
-    string shortName;
-    string email;
-    string phoneNumber;
-};
-
-type RequirementList record {
-    string name;
-    MedicalNeed[] needs = [];
+    string 'type;
+    string unit;
 };
 
 type MedicalNeed record {
@@ -46,7 +40,9 @@ type MedicalNeed record {
     time:Date period;
     string urgency;
     int neededQuantity;
+    int remainingQuantity;
     Beneficiary? beneficiary = ();
+    Quotation[] supplierQuotes = [];
     MedicalItem? medicalItem = ();
 };
 
@@ -61,6 +57,7 @@ type Quotation record {
     string regulatoryInfo;
     decimal unitPrice;
     Supplier? supplier = ();
+    MedicalItem? medicalItem = ();
 };
 
 type AidPackage record {
@@ -68,7 +65,7 @@ type AidPackage record {
     string description;
     string name;
     string? status = "Draft";
-    AidPackageItem?[] aidPackageItems = [];
+    AidPackageItem[] aidPackageItems = [];
 };
 
 type AidPackageItem record {
@@ -82,7 +79,7 @@ type AidPackageItem record {
 };
 
 type AidPackageUpdate record {
-    int? packageUpdateId = ();
+    int? packageUpdateID = ();
     int? packageID = ();
     string updateComment;
     string? dateTime = ();
@@ -94,24 +91,12 @@ type Pledge record {
     int donorID;
     decimal amount;
     string status;
+    Donor? donor;
 };
 
 type PledgeUpdate record {
-    int? pledgeUpdateId = ();
+    int? pledgeUpdateID = ();
     int? pledgeID = ();
     string updateComment;
     string? dateTime = ();
-};
-
-// Information type
-type MedicalNeedInfo record {
-    int needID;
-    int itemID;
-    string name;
-    time:Date period;
-    string urgency;
-    int neededQuantity;
-    int remainingQuantity;
-    Beneficiary? beneficiary = ();
-    Quotation[] supplierQuotes = [];
 };
