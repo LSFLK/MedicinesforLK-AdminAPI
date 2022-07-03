@@ -40,7 +40,7 @@ type MedicalNeed record {
     time:Date period;
     string urgency;
     int neededQuantity;
-    int remainingQuantity;
+    int? remainingQuantity = 0;
     Beneficiary? beneficiary = ();
     Quotation[] supplierQuotes = [];
     MedicalItem? medicalItem = ();
