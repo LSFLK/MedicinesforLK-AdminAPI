@@ -170,7 +170,6 @@ service /admin on new http:Listener(9090) {
     # A resource for creating Aid-Package
     # + return - Aid-Package
     resource function post aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
-        aidPackage.status = "Draft";
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS)
                                         VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status});`;
         sql:ExecutionResult result = check dbClient->execute(query);
