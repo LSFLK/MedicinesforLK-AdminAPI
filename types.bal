@@ -18,7 +18,7 @@ type Beneficiary record {
 };
 
 type Donor record {
-    int? donarID = ();
+    int? donorID = ();
     string orgName;
     string orgLink;
     string email;
