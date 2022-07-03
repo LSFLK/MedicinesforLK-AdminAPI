@@ -64,7 +64,7 @@ type AidPackage record {
     int packageID = -1;
     string description;
     string name;
-    string status;
+    string? status = "Draft";
     AidPackageItem[] aidPackageItems = [];
 };
 
@@ -74,7 +74,7 @@ type AidPackageItem record {
     int quotationID;
     int needID;
     int quantity;
-    decimal totalAmount;
+    decimal totalAmount = 0;
     Quotation? quotation = ();
 };
 
