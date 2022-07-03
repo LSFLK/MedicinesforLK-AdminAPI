@@ -1,9 +1,11 @@
 import ballerina/http;
-import ballerinax/mysql;
+import ballerina/io;
+import ballerina/log;
+import ballerina/mime;
+import ballerina/regex;
 import ballerina/sql;
 import ballerina/time;
-import ballerina/io;
-import ballerina/uuid;
+import ballerinax/mysql;
 
 final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -419,16 +421,212 @@ service /admin on new http:Listener(9090) {
         return pledgeUpdateID;
     }
 
-    resource function post requirements(http:Caller caller,http:Request request) returns error? {
-        stream<byte[], io:Error?> incomingStreamer = check request.getByteStream();
-        string uuid = uuid:createType1AsString();
-        string filePath="./files/"+uuid+".csv";
-        check io:fileWriteBlocksFromStream(filePath, incomingStreamer);
-        check incomingStreamer.close();
-
-        string[][] readCsv = check io:fileReadCsv(filePath);
-        io:println(readCsv);
-
-        check caller->respond("CSV File Received!");
+    resource function post requirements/medicalneeds(http:Request request) returns http:Response|error {
+        http:Response response = new;
+        string[][] csvLines = check handleCSVBodyParts(request);
+        MedicalNeed[] medicalNeeds = check createMedicalNeedsFromCSVData(csvLines);
+        error? ret = updateMedicalNeedsTable(medicalNeeds);
+        if ret is error {
+            return ret;
+        } else {
+            response.setPayload("CSV File uploaded successfully");
+            return response;
+        }
     }
+}
+
+function handleCSVBodyParts(http:Request request) returns string[][]|error {
+    var bodyParts = request.getBodyParts();
+    if (bodyParts is mime:Entity[]) {
+        string[][] csvLines = [];
+        foreach var bodyPart in bodyParts {
+            var mediaType = mime:getMediaType(bodyPart.getContentType());
+            if (mediaType is mime:MediaType) {
+                string baseType = mediaType.getBaseType();
+                if ("text/csv" == baseType) {
+                    byte[] payload = check bodyPart.getByteArray();
+                    csvLines = check getCSVData(payload);
+                } else {
+                    return error("Invalid base type, not text/csv");
+                }
+            } else {
+                return error("Invalid media type");
+            }
+        }
+        return csvLines;
+    } else {
+        log:printError(bodyParts.message());
+        return error("Error in decoding multiparts!");
+    }
+}
+
+function getCSVData(byte[] payload) returns string[][]|error {
+    io:ReadableByteChannel readableByteChannel = check io:createReadableChannel(payload);
+    io:ReadableCharacterChannel readableCharacterChannel = new (readableByteChannel, "UTF-8");
+    io:ReadableCSVChannel readableCSVChannel = new io:ReadableCSVChannel(readableCharacterChannel, ",", 1);
+    return check channelReadCsv(readableCSVChannel);
+}
+
+function channelReadCsv(io:ReadableCSVChannel readableCSVChannel) returns string[][]|error {
+    string[][] results = [];
+    int i = 0;
+    while readableCSVChannel.hasNext() {
+        var records = readableCSVChannel.getNext();
+        if records is string[] {
+            results[i] = records;
+            i += 1;
+        } else if records is error {
+            check readableCSVChannel.close();
+            return records;
+        }
+    }
+    check readableCSVChannel.close();
+    return results;
+}
+
+function readCSVLine(string[] line) returns [string, int, string, string, string, string, string, int]|error => [
+    line[0],
+    check int:fromString(line[1].trim()),
+    line[2],
+    line[3],
+    line[4],
+    line[5],
+    line[5],
+    check int:fromString(line[7].trim())
+];
+
+function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalNeed[]|error {
+    MedicalNeed[] medicalNeeds = [];
+    int csvLine = 0;
+    foreach var line in inputCSVData {
+        csvLine += 1;
+        if (line.length() == 8) {
+            var [lookupIndex2, sumQuantity, urgency, period, beneficiary, itemName, unit, neededQuantity] = check readCSVLine(line);
+            int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemName};`); //Todo: Accumilate error
+            if (itemID is error) {
+                return constructError(csvLine, string `${itemName} from MEDICAL_ITEM table`);
+            }
+            int|error beneficiaryID = check dbClient->queryRow(`SELECT BENEFICIARYID FROM BENEFICIARY WHERE NAME=${beneficiary};`); //Todo: Accumilate error
+            if (beneficiaryID is error) {
+                return constructError(csvLine, string `${beneficiary} from BENEFICIARY table`);
+            }
+            MedicalNeed medicalNeed = {
+                itemID,
+                beneficiaryID,
+                period: check getPeriod(period),
+                urgency,
+                neededQuantity
+            };
+            medicalNeeds.push(medicalNeed);
+        }
+        else {
+            log:printError(string `Invalid CSV Length in line:${csvLine}`);
+        }
+    }
+    return medicalNeeds;
+}
+
+function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns error? {
+    log:printInfo("Updated Medical NEeds Table");
+    MedicalNeed[] needsRequireUpdate = [];
+    MedicalNeed[] newMedicalNeed = [];
+    foreach MedicalNeed medicalNeed in medicalNeeds {
+        int|error needID = dbClient->queryRow(`SELECT NEEDID FROM MEDICAL_NEED 
+                                    WHERE ITEMID=${medicalNeed.itemID} AND BENEFICIARYID =${medicalNeed.beneficiaryID} 
+                                    AND PERIOD=${medicalNeed.period}`);
+        if (needID is int) {
+            needsRequireUpdate.push(medicalNeed);
+        } else {
+            newMedicalNeed.push(medicalNeed);
+        }
+    }
+    log:printInfo(string `Total Medical Needs Count:${medicalNeeds.length()}|
+                          Requre Update:${needsRequireUpdate.length()} |New Needs:${newMedicalNeed.length()}`);
+    sql:ParameterizedQuery[] insertQueries =
+        from var data in newMedicalNeed
+        select `INSERT INTO MEDICAL_NEED 
+                (ITEMID, BENEFICIARYID, PERIOD, NEEDEDQUANTITY, REMAININGQUANTITY, URGENCY) 
+                VALUES (${data.itemID}, ${data.beneficiaryID},
+                ${data.period}, ${data.neededQuantity}, 0, ${data.urgency})`; //TODO:What is remainingqunatity
+
+    //TODO:What is remainingqunatity
+    sql:ParameterizedQuery[] updateQueries =
+        from var data in needsRequireUpdate
+        select `UPDATE MEDICAL_NEED 
+                SET NEEDEDQUANTITY = ${data.neededQuantity},
+                REMAININGQUANTITY = 0 ,
+                URGENCY = ${data.urgency} 
+                WHERE ITEMID = ${data.itemID} AND BENEFICIARYID = ${data.beneficiaryID} AND PERIOD = ${data.period}`;
+
+    transaction {
+        var insertResult = dbClient->batchExecute(insertQueries);
+        var updateResult = dbClient->batchExecute(updateQueries);
+        if insertResult is sql:BatchExecuteError || updateResult is sql:BatchExecuteError {
+            rollback;
+            return error("Transaction Failed"); //TODO:Add more detailed error
+        } else {
+            error? err = commit;
+            if err is error {
+                io:println("Error occurred while committing: ", err);
+                return error("Error occurred while committing"); //TODO:Add more detailed error
+            }
+        }
+    }
+}
+
+function getPeriod(string period) returns time:Date|error {
+    string[] dateParts = regex:split(period, " ");
+    int year = check int:fromString(dateParts[1]);
+    int month = check getMonth(dateParts[0]);
+    time:Date date = {year: year, month: month, day: 1};
+    return date;
+}
+
+function getMonth(string month) returns int|error {
+    match month {
+        "Jan" => {
+            return 1;
+        }
+        "Feb" => {
+            return 2;
+        }
+        "Mar" => {
+            return 3;
+        }
+        "Apr" => {
+            return 4;
+        }
+        "May" => {
+            return 5;
+        }
+        "Jun" => {
+            return 6;
+        }
+        "Jul" => {
+            return 7;
+        }
+        "Aug" => {
+            return 8;
+        }
+        "Sep" => {
+            return 9;
+        }
+        "Oct" => {
+            return 10;
+        }
+        "Nov" => {
+            return 11;
+        }
+        "Dec" => {
+            return 12;
+        }
+        _ => {
+            return error("Invalid month in the Period");
+        }
+    }
+}
+
+function constructError(int line, string query) returns error {
+    string errorMessage = string `Query: ${query} failed for CSV line:${line}`;
+    return error(errorMessage);
 }
