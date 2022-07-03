@@ -10,7 +10,7 @@ type Supplier record {
 };
 
 type Beneficiary record {
-    int beneficiaryID = -1;
+    int? beneficiaryID = ();
     string name;
     string shortName;
     string email;
@@ -18,7 +18,7 @@ type Beneficiary record {
 };
 
 type Donor record {
-    int donorID = -1;
+    int? donorID = ();
     string orgName;
     string orgLink;
     string email;
@@ -34,7 +34,7 @@ type MedicalItem record {
 };
 
 type MedicalNeed record {
-    int needID = -1;
+    int? needID = ();
     int itemID;
     int beneficiaryID;
     time:Date period;
@@ -43,11 +43,11 @@ type MedicalNeed record {
     int remainingQuantity;
     Beneficiary? beneficiary = ();
     Quotation[] supplierQuotes = [];
-    MedicalItem? medicalItem = ();
+    MedicalItem[] medicalItem = [];
 };
 
 type Quotation record {
-    int quotationID = -1;
+    int? quotationID = ();
     int supplierID;
     int itemID;
     string brandName;
@@ -61,7 +61,7 @@ type Quotation record {
 };
 
 type AidPackage record {
-    int packageID = -1;
+    int? packageID = ();
     string description;
     string name;
     string? status = "Draft";
@@ -69,8 +69,8 @@ type AidPackage record {
 };
 
 type AidPackageItem record {
-    int packageItemID = -1;
-    int packageID;
+    int? packageItemID = ();
+    int? packageID = ();
     int quotationID;
     int needID;
     int quantity;
@@ -79,14 +79,14 @@ type AidPackageItem record {
 };
 
 type AidPackageUpdate record {
-    int packageUpdateId = -1;
+    int? packageUpdateId = ();
     int packageID;
     string updateComment;
-    string? dateTime;
+    string? dateTime = ();
 };
 
 type Pledge record {
-    int pledgeID = -1;
+    int? pledgeID = ();
     int packageID;
     int donorID;
     decimal amount;
@@ -95,7 +95,7 @@ type Pledge record {
 };
 
 type PledgeUpdate record {
-    int pledgeUpdateID = -1;
+    int? pledgeUpdateID = ();
     int pledgeID;
     string updateComment;
     string? dateTime = ();
