@@ -160,7 +160,7 @@ service /admin on new http:Listener(9090) {
         check resultItemStream.close();
         foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
             aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME,
                                                                 AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
                                                                 UNITPRICE, REGULATORYINFO
                                                                 FROM QUOTATION 
@@ -421,6 +421,10 @@ service /admin on new http:Listener(9090) {
         return pledgeUpdateID;
     }
 
+    # A resource for uploading medical needs CSV file
+    #
+    # + request - http:Request with the file payload
+    # + return - Return http:Response or an error
     resource function post requirements/medicalneeds(http:Request request) returns http:Response|error {
         http:Response response = new;
         string[][] csvLines = check handleCSVBodyParts(request);
