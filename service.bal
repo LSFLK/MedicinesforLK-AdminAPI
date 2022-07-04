@@ -160,7 +160,7 @@ service /admin on new http:Listener(9090) {
         check resultItemStream.close();
         foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
             aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                QUOTATIONID, SUPPLIERID, BRANDNAME,
+                                                                QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME,
                                                                 AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
                                                                 UNITPRICE, REGULATORYINFO
                                                                 FROM QUOTATION 
@@ -217,7 +217,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for creating AidPackage-Item
     # + return - AidPackage-Item
-    resource function post aidPackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
+    resource function post aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
         aidPackageItem.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
@@ -284,7 +284,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for fetching all comments of an Aid-Package
     # + return - list of AidPackageUpdateComments
-    resource function get aidPackages/[int packageID]/updatecomments() returns AidPackageUpdate[]|error {
+    resource function get aidpackages/[int packageID]/updatecomments() returns AidPackageUpdate[]|error {
         AidPackageUpdate[] aidPackageUpdates = [];
         stream<AidPackageUpdate, error?> resultStream = dbClient->query(`SELECT
                                                                          PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME 
@@ -300,7 +300,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for saving update with a comment to an Aid-Package
     # + return - AidPackageUpdateComment
-    resource function put aidPackages/[int packageID]/updatecomments(@http:Payload AidPackageUpdate aidPackageUpdate)
+    resource function put aidpackages/[int packageID]/updatecomments(@http:Payload AidPackageUpdate aidPackageUpdate)
                                                                 returns AidPackageUpdate?|error {
         aidPackageUpdate.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
@@ -324,7 +324,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for removing an update comment from an Aid-Package
     # + return - aidPackageUpdateId
-    resource function delete aidPackages/[int packageID]/updatecomment/[int packageUpdateID]() returns int|error
+    resource function delete aidpackages/[int packageID]/updatecomment/[int packageUpdateID]() returns int|error
     {
         sql:ParameterizedQuery query = `DELETE FROM AID_PACKAGE_UPDATE 
                                         WHERE 
@@ -336,7 +336,7 @@ service /admin on new http:Listener(9090) {
 
     # A resource for fetching all pledges of an Aid-Package
     # + return - list of pledges
-    resource function get aidPackage/[int packageID]/pledges() returns Pledge[]|error {
+    resource function get aidpackage/[int packageID]/pledges() returns Pledge[]|error {
         Pledge[] pledges = [];
         stream<Pledge, error?> resultStream = dbClient->query(`SELECT
                                                                PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
@@ -421,6 +421,10 @@ service /admin on new http:Listener(9090) {
         return pledgeUpdateID;
     }
 
+    # A resource for uploading medical needs CSV file
+    #
+    # + request - http:Request with the file payload
+    # + return - Return http:Response or an error
     resource function post requirements/medicalneeds(http:Request request) returns http:Response|error {
         http:Response response = new;
         string[][] csvLines = check handleCSVBodyParts(request);
