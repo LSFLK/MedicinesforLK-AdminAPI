@@ -355,6 +355,34 @@ service /admin on new http:Listener(9090) {
         return pledges;
     }
 
+    # A resource for fetching details of all pledges
+    # + return - list of Pledges
+    resource function get pledges() returns Pledge[]|error {
+        Pledge[] pledges = [];
+        stream<Pledge, error?> resultStream = dbClient->query(`SELECT PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
+                                                                     FROM PLEDGE;`);
+        check from Pledge pledge in resultStream
+            do {
+                pledges.push(pledge);
+            };
+        check resultStream.close();
+        return pledges;
+    }
+
+    # A resource for fetching pledges for a given pledge ID
+    # + return - list of Pledges
+    resource function get pledges/[int pledgeID]() returns Pledge[]|error {
+        Pledge[] pledges = [];
+        stream<Pledge, error?> resultStream = dbClient->query(`SELECT PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
+                                                                     FROM PLEDGE WHERE PLEDGEID=${pledgeID};`);
+        check from Pledge pledge in resultStream
+            do {
+                pledges.push(pledge);
+            };
+        check resultStream.close();
+        return pledges;
+    }
+
     # A resource for fetching all comments of a pledge
     # + return - list of PledgeUpdateComments
     resource function get pledges/[int pledgeID]/updatecomments() returns PledgeUpdate[]|error {
@@ -529,7 +557,7 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
     int csvLine = 0;
     foreach var line in inputCSVData {
         boolean hasError = false;
-        int medicalItemId  = -1;
+        int medicalItemId = -1;
         int medicalBeneficiaryId = -1;
         csvLine += 1;
         if (line.length() == 8) {
