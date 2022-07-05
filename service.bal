@@ -459,7 +459,6 @@ function handleCSVBodyParts(http:Request request) returns string[][]|error {
         }
         return csvLines;
     } else {
-        log:printError(bodyParts.message());
         return error("Error in decoding multiparts!");
     }
 }
@@ -501,37 +500,54 @@ function readCSVLine(string[] line) returns [string, int, string, string, string
 
 function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalNeed[]|error {
     MedicalNeed[] medicalNeeds = [];
+    string errorMessages = "";
     int csvLine = 0;
     foreach var line in inputCSVData {
+        boolean hasError = false;
+        int medicalItemId  = -1;
+        int medicalBeneficiaryId = -1;
         csvLine += 1;
         if (line.length() == 8) {
             var [lookupIndex2, sumQuantity, urgency, period, beneficiary, itemName, unit, neededQuantity] = check readCSVLine(line);
             int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemName};`); //Todo: Accumilate error
             if (itemID is error) {
-                return constructError(csvLine, string `${itemName} from MEDICAL_ITEM table`);
+                errorMessages = errorMessages + string `Line:${csvLine}| ${itemName} is missing in MEDICAL_ITEM table 
+`;
+                hasError = true;
+            } else {
+                medicalItemId = itemID;
             }
-            int|error beneficiaryID = check dbClient->queryRow(`SELECT BENEFICIARYID FROM BENEFICIARY WHERE NAME=${beneficiary};`); //Todo: Accumilate error
+            int|error beneficiaryID = dbClient->queryRow(`SELECT BENEFICIARYID FROM BENEFICIARY WHERE NAME=${beneficiary};`); //Todo: Accumilate error
             if (beneficiaryID is error) {
-                return constructError(csvLine, string `${beneficiary} from BENEFICIARY table`);
+                errorMessages = errorMessages + string `Line:${csvLine}| ${beneficiary} is missing in BENEFICIARY table 
+`;
+                hasError = true;
+            } else {
+                medicalBeneficiaryId = beneficiaryID;
             }
-            MedicalNeed medicalNeed = {
-                itemID,
-                beneficiaryID,
-                period: check getPeriod(period),
-                urgency,
-                neededQuantity
-            };
-            medicalNeeds.push(medicalNeed);
+
+            if (!hasError) {
+                MedicalNeed medicalNeed = {
+                    itemID: medicalItemId,
+                    beneficiaryID: medicalBeneficiaryId,
+                    period: check getPeriod(period),
+                    urgency,
+                    neededQuantity
+                };
+                medicalNeeds.push(medicalNeed);
+            }
         }
         else {
             log:printError(string `Invalid CSV Length in line:${csvLine}`);
         }
     }
+    if (errorMessages.length() > 0) {
+        return error(errorMessages);
+    }
     return medicalNeeds;
 }
 
 function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns error? {
-    log:printInfo("Updated Medical NEeds Table");
     MedicalNeed[] needsRequireUpdate = [];
     MedicalNeed[] newMedicalNeed = [];
     foreach MedicalNeed medicalNeed in medicalNeeds {
@@ -571,7 +587,6 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns error? {
         } else {
             error? err = commit;
             if err is error {
-                io:println("Error occurred while committing: ", err);
                 return error("Error occurred while committing"); //TODO:Add more detailed error
             }
         }
@@ -630,7 +645,7 @@ function getMonth(string month) returns int|error {
     }
 }
 
-function constructError(int line, string query) returns error {
-    string errorMessage = string `Query: ${query} failed for CSV line:${line}`;
-    return error(errorMessage);
-}
+// function constructError(int line, string query) returns error {
+//     string errorMessage = string `Query: ${query} failed for CSV line:${line}`;
+//     return error(errorMessage);
+// }
