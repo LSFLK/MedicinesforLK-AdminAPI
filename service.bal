@@ -520,7 +520,7 @@ function readSupplyQuotationsCSVLine(string[] line) returns [string, string, str
     line[5],
     check int:fromString(line[6].trim()),
     line[7],
-    check decimal:fromString(line[8].substring(1,line[8].length()-1).trim())
+    check decimal:fromString(line[8].substring(1, line[8].length() - 1).trim())
 ];
 
 function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalNeed[]|error {
@@ -574,36 +574,51 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
 
 function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]|error {
     Quotation[] qutoations = [];
+    string errorMessages = "";
     int csvLine = 0;
     foreach var line in inputCSVData {
+        boolean hasError = false;
+        int medicalItemId = -1;
+        int quotationSupplierId = -1;
         csvLine += 1;
         if (line.length() == 9) {
-            
-            var [itemLookup, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, expiryDate,unitPrice] = check readSupplyQuotationsCSVLine(line);
+            var [itemLookup, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, expiryDate, unitPrice] = check readSupplyQuotationsCSVLine(line);
             int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemNeeded};`); //Todo: Accumilate error
             if (itemID is error) {
-                return constructError(csvLine, string `${itemNeeded} from MEDICAL_ITEM table`);
+                errorMessages = errorMessages + string `Line:${csvLine}| ${itemNeeded} is missing in MEDICAL_ITEM table
+`;
+                hasError = true;
+            } else {
+                medicalItemId = itemID;
             }
             int|error supplierID = dbClient->queryRow(`SELECT SUPPLIERID FROM SUPPLIER WHERE SHORTNAME=${supplier};`); //Todo: Accumilate error
             if (supplierID is error) {
-                return constructError(csvLine, string `${supplier} from SUPPLIER table`);
+                errorMessages = errorMessages + string `Line:${csvLine}| ${supplier} is missing in SUPPLIER table
+`;
+                hasError = true;
+            } else {
+                quotationSupplierId = supplierID;
             }
-
-            Quotation quotation = {
-                supplierID,
-                itemID,
-                brandName,
-                availableQuantity,
-                period: check getPeriod(period),
-                expiryDate: check getDateFromString(expiryDate),
-                regulatoryInfo,
-                unitPrice
-            };
-            qutoations.push(quotation);
+            if (!hasError) {
+                Quotation quotation = {
+                    supplierID: quotationSupplierId,
+                    itemID: medicalItemId,
+                    brandName,
+                    availableQuantity,
+                    period: check getPeriod(period),
+                    expiryDate: check getDateFromString(expiryDate),
+                    regulatoryInfo,
+                    unitPrice
+                };
+                qutoations.push(quotation);
+            }
         }
         else {
             log:printError(string `Invalid CSV Length in line:${csvLine}`);
         }
+    }
+    if (errorMessages.length() > 0) {
+        return error(errorMessages);
     }
     return qutoations;
 }
@@ -654,9 +669,7 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns error? {
     }
 }
 
-
 function updateQuotationsTable(Quotation[] quotations) returns error? {
-    log:printInfo("Updated Quotations Table");
     Quotation[] quotationsRequireUpdate = [];
     Quotation[] newquotations = [];
     foreach Quotation quotation in quotations {
@@ -673,14 +686,14 @@ function updateQuotationsTable(Quotation[] quotations) returns error? {
                           Requre Update:${quotationsRequireUpdate.length()} |New Quotations:${newquotations.length()}`);
     sql:ParameterizedQuery[] insertQueries =
         from var data in newquotations
-        select `INSERT INTO QUOTATION 
+    select `INSERT INTO QUOTATION 
                 (SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD, EXPIRYDATE, UNITPRICE, REGULATORYINFO) 
-                VALUES (${data.supplierID}, ${data.itemID},${data.brandName}, ${data.availableQuantity}, ${data.period}, ${data.expiryDate}, ${data.unitPrice}, ${data.regulatoryInfo})`; 
-                
+                VALUES (${data.supplierID}, ${data.itemID},${data.brandName}, ${data.availableQuantity}, ${data.period}, ${data.expiryDate}, ${data.unitPrice}, ${data.regulatoryInfo})`;
+
     //TODO:What is remainingqunatity
     sql:ParameterizedQuery[] updateQueries =
         from var data in quotationsRequireUpdate
-        select `UPDATE QUOTATION 
+    select `UPDATE QUOTATION 
                 SET AVAILABLEQUANTITY = ${data.availableQuantity},
                 EXPIRYDATE = ${data.expiryDate},
                 UNITPRICE = ${data.unitPrice}, 
@@ -693,11 +706,10 @@ function updateQuotationsTable(Quotation[] quotations) returns error? {
         if insertResult is sql:BatchExecuteError || updateResult is sql:BatchExecuteError {
             rollback;
             return error("Transaction Failed"); //TODO:Add more detailed error
-            
+
         } else {
             error? err = commit;
             if err is error {
-                io:println("Error occurred while committing: ", err);
                 return error("Error occurred while committing"); //TODO:Add more detailed error
             }
         }
@@ -757,7 +769,7 @@ function getMonth(string month) returns int|error {
 }
 
 # A function for getting date from string in format mm/dd/yyyy
-    # + return - PledgeUpdateComment
+# + return - PledgeUpdateComment
 function getDateFromString(string dateString) returns time:Date|error {
     string[] dateParts = regex:split(dateString, "/");
     time:Date date = {year: check int:fromString(dateParts[2]), month: check int:fromString(dateParts[0]), day: check int:fromString(dateParts[1])};
