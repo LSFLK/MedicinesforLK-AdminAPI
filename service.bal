@@ -584,7 +584,7 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
             if (itemID is error) {
                 return constructError(csvLine, string `${itemNeeded} from MEDICAL_ITEM table`);
             }
-            int|error supplierID = check dbClient->queryRow(`SELECT SUPPLIERID FROM SUPPLIER WHERE SHORTNAME=${supplier};`); //Todo: Accumilate error
+            int|error supplierID = dbClient->queryRow(`SELECT SUPPLIERID FROM SUPPLIER WHERE SHORTNAME=${supplier};`); //Todo: Accumilate error
             if (supplierID is error) {
                 return constructError(csvLine, string `${supplier} from SUPPLIER table`);
             }
