@@ -123,22 +123,7 @@ service /admin on new http:Listener(9090) {
             };
         check resultStream.close();
         foreach AidPackage aidPackage in aidPackages {
-            aidPackage.aidPackageItems = [];
-            stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
-                                                                               NEEDID, QUANTITY, TOTALAMOUNT 
-                                                                               FROM AID_PACKAGE_ITEM
-                                                                               WHERE PACKAGEID=${aidPackage.packageID};`);
-            check from AidPackageItem aidPackageItem in resultItemStream
-                do {
-                    aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                    QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME,
-                                                                    AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                                    UNITPRICE, REGULATORYINFO
-                                                                    FROM QUOTATION 
-                                                                    WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
-                    aidPackage.aidPackageItems.push(aidPackageItem);
-                };
-            check resultItemStream.close();
+            check constructAidPackageData(aidPackage);
         }
         return aidPackages;
     }
@@ -148,24 +133,7 @@ service /admin on new http:Listener(9090) {
     resource function get aidpackages/[int packageID]() returns AidPackage|error {
         AidPackage aidPackage = check dbClient->queryRow(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS FROM AID_PACKAGE
                                                           WHERE PACKAGEID=${packageID};`);
-        stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
-                                                                           NEEDID, QUANTITY, TOTALAMOUNT 
-                                                                           FROM AID_PACKAGE_ITEM
-                                                                           WHERE PACKAGEID=${packageID};`);
-        aidPackage.aidPackageItems = [];
-        check from AidPackageItem aidPackageItem in resultItemStream
-            do {
-                aidPackage.aidPackageItems.push(aidPackageItem);
-            };
-        check resultItemStream.close();
-        foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
-            aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                                QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME,
-                                                                AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                                UNITPRICE, REGULATORYINFO
-                                                                FROM QUOTATION 
-                                                                WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
-        }
+        check constructAidPackageData(aidPackage);
         return aidPackage;
     }
 
@@ -480,6 +448,39 @@ service /admin on new http:Listener(9090) {
     }
 }
 
+function constructAidPackageData(AidPackage aidPackage) returns error? {
+    aidPackage.aidPackageItems = [];
+    stream<AidPackageItem, error?> resultItemStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
+                                                                               NEEDID, QUANTITY, TOTALAMOUNT 
+                                                                               FROM AID_PACKAGE_ITEM
+                                                                               WHERE PACKAGEID=${aidPackage.packageID};`);
+    decimal totalAmount = 0;
+    check from AidPackageItem aidPackageItem in resultItemStream
+        do {
+            Quotation quotation = check dbClient->queryRow(`SELECT
+                                                                    QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME,
+                                                                    AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                                    UNITPRICE, REGULATORYINFO
+                                                                    FROM QUOTATION 
+                                                                    WHERE QUOTATIONID=${aidPackageItem.quotationID}`); //TODO:What if row is not there
+            quotation.supplier = check dbClient->queryRow(`SELECT
+                                                                    SUPPLIERID, NAME, SHORTNAME,
+                                                                    EMAIL, PHONENUMBER 
+                                                                    FROM SUPPLIER 
+                                                                    WHERE SUPPLIERID=${quotation.supplierID}`);
+            aidPackageItem.quotation = quotation;
+            aidPackage.aidPackageItems.push(aidPackageItem);
+            totalAmount = totalAmount + aidPackageItem.totalAmount;
+        };
+    check resultItemStream.close();
+    aidPackage.goalAmount = totalAmount;
+    decimal|error recievedAmount = dbClient->queryRow(`SELECT IFNULL(SUM(AMOUNT),0) FROM PLEDGE 
+                                                        WHERE PACKAGEID = ${aidPackage.packageID};`);
+    if(recievedAmount is decimal) {
+        aidPackage.receivedAmount = recievedAmount;
+    }
+}
+
 function handleCSVBodyParts(http:Request request) returns string[][]|error {
     var bodyParts = request.getBodyParts();
     if (bodyParts is mime:Entity[]) {
@@ -561,7 +562,7 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
         int medicalBeneficiaryId = -1;
         csvLine += 1;
         if (line.length() == 8) {
-            var [lookupIndex2, sumQuantity, urgency, period, beneficiary, itemName, unit, neededQuantity] = check readMedicalNeedsCSVLine(line);
+            var [_, _, urgency, period, beneficiary, itemName, _, neededQuantity] = check readMedicalNeedsCSVLine(line);
             int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemName};`);
             if (itemID is error) {
                 errorMessages = errorMessages + string `Line:${csvLine}| ${itemName} is missing in MEDICAL_ITEM table 
@@ -610,7 +611,7 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
         int quotationSupplierId = -1;
         csvLine += 1;
         if (line.length() == 9) {
-            var [itemLookup, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, expiryDate, unitPrice] = check readSupplyQuotationsCSVLine(line);
+            var [_, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, expiryDate, unitPrice] = check readSupplyQuotationsCSVLine(line);
             int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemNeeded};`);
             if (itemID is error) {
                 errorMessages = errorMessages + string `Line:${csvLine}| ${itemNeeded} is missing in MEDICAL_ITEM table
@@ -671,7 +672,7 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns error? {
     select `INSERT INTO MEDICAL_NEED 
                 (ITEMID, BENEFICIARYID, PERIOD, NEEDEDQUANTITY, REMAININGQUANTITY, URGENCY) 
                 VALUES (${data.itemID}, ${data.beneficiaryID},
-                ${data.period}, ${data.neededQuantity}, 0, ${data.urgency})`; 
+                ${data.period}, ${data.neededQuantity}, 0, ${data.urgency})`;
 
     sql:ParameterizedQuery[] updateQueries =
         from var data in needsRequireUpdate
@@ -717,7 +718,6 @@ function updateQuotationsTable(Quotation[] quotations) returns error? {
                 (SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD, EXPIRYDATE, UNITPRICE, REGULATORYINFO) 
                 VALUES (${data.supplierID}, ${data.itemID},${data.brandName}, ${data.availableQuantity}, ${data.period}, ${data.expiryDate}, ${data.unitPrice}, ${data.regulatoryInfo})`;
 
-    
     sql:ParameterizedQuery[] updateQueries =
         from var data in quotationsRequireUpdate
     select `UPDATE QUOTATION 
@@ -795,8 +795,6 @@ function getMonth(string month) returns int|error {
     }
 }
 
-# A function for getting date from string in format mm/dd/yyyy
-# + return - PledgeUpdateComment
 function getDateFromString(string dateString) returns time:Date|error {
     string[] dateParts = regex:split(dateString, "/");
     time:Date date = {year: check int:fromString(dateParts[2]), month: check int:fromString(dateParts[0]), day: check int:fromString(dateParts[1])};
