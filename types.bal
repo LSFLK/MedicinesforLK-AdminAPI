@@ -1,6 +1,5 @@
 import ballerina/time;
 
-// Stakeholders
 type Supplier record {
     int? supplierID = ();
     string name;
@@ -56,7 +55,7 @@ type Quotation record {
     time:Date expiryDate;
     string regulatoryInfo;
     decimal unitPrice;
-    Supplier? supplier = ();
+    Supplier supplier?;
     MedicalItem? medicalItem = ();
 };
 
@@ -65,6 +64,8 @@ type AidPackage record {
     string description;
     string name;
     string? status = "Draft";
+    decimal goalAmount?;
+    decimal receivedAmount?;
     AidPackageItem[] aidPackageItems = [];
 };
 
