@@ -386,17 +386,17 @@ service /admin on new http:Listener(9090) {
     # A resource for fetching all comments of a pledge
     # + return - list of PledgeUpdateComments
     resource function get pledges/[int pledgeID]/updatecomments() returns PledgeUpdate[]|error {
-        PledgeUpdate[] PledgeUpdates = [];
+        PledgeUpdate[] pledgeUpdates = [];
         stream<PledgeUpdate, error?> resultStream = dbClient->query(`SELECT
                                                                      PLEDGEID, PLEDGEUPDATEID, UPDATECOMMENT, DATETIME 
                                                                      FROM PLEDGE_UPDATE
                                                                      WHERE PLEDGEID=${pledgeID};`);
-        check from PledgeUpdate PledgeUpdate in resultStream
+        check from PledgeUpdate pledgeUpdate in resultStream
             do {
-                PledgeUpdates.push(PledgeUpdate);
+                pledgeUpdates.push(pledgeUpdate);
             };
         check resultStream.close();
-        return PledgeUpdates;
+        return pledgeUpdates;
     }
 
     # A resource for removing a Pldege
@@ -562,7 +562,7 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
         csvLine += 1;
         if (line.length() == 8) {
             var [lookupIndex2, sumQuantity, urgency, period, beneficiary, itemName, unit, neededQuantity] = check readMedicalNeedsCSVLine(line);
-            int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemName};`); //Todo: Accumilate error
+            int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemName};`);
             if (itemID is error) {
                 errorMessages = errorMessages + string `Line:${csvLine}| ${itemName} is missing in MEDICAL_ITEM table 
 `;
@@ -570,7 +570,7 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
             } else {
                 medicalItemId = itemID;
             }
-            int|error beneficiaryID = dbClient->queryRow(`SELECT BENEFICIARYID FROM BENEFICIARY WHERE NAME=${beneficiary};`); //Todo: Accumilate error
+            int|error beneficiaryID = dbClient->queryRow(`SELECT BENEFICIARYID FROM BENEFICIARY WHERE NAME=${beneficiary};`);
             if (beneficiaryID is error) {
                 errorMessages = errorMessages + string `Line:${csvLine}| ${beneficiary} is missing in BENEFICIARY table 
 `;
@@ -611,7 +611,7 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
         csvLine += 1;
         if (line.length() == 9) {
             var [itemLookup, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, expiryDate, unitPrice] = check readSupplyQuotationsCSVLine(line);
-            int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemNeeded};`); //Todo: Accumilate error
+            int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemNeeded};`);
             if (itemID is error) {
                 errorMessages = errorMessages + string `Line:${csvLine}| ${itemNeeded} is missing in MEDICAL_ITEM table
 `;
@@ -619,7 +619,7 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
             } else {
                 medicalItemId = itemID;
             }
-            int|error supplierID = dbClient->queryRow(`SELECT SUPPLIERID FROM SUPPLIER WHERE SHORTNAME=${supplier};`); //Todo: Accumilate error
+            int|error supplierID = dbClient->queryRow(`SELECT SUPPLIERID FROM SUPPLIER WHERE SHORTNAME=${supplier};`);
             if (supplierID is error) {
                 errorMessages = errorMessages + string `Line:${csvLine}| ${supplier} is missing in SUPPLIER table
 `;
@@ -671,9 +671,8 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns error? {
     select `INSERT INTO MEDICAL_NEED 
                 (ITEMID, BENEFICIARYID, PERIOD, NEEDEDQUANTITY, REMAININGQUANTITY, URGENCY) 
                 VALUES (${data.itemID}, ${data.beneficiaryID},
-                ${data.period}, ${data.neededQuantity}, 0, ${data.urgency})`; //TODO:What is remainingqunatity
+                ${data.period}, ${data.neededQuantity}, 0, ${data.urgency})`; 
 
-    //TODO:What is remainingqunatity
     sql:ParameterizedQuery[] updateQueries =
         from var data in needsRequireUpdate
     select `UPDATE MEDICAL_NEED 
@@ -718,7 +717,7 @@ function updateQuotationsTable(Quotation[] quotations) returns error? {
                 (SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD, EXPIRYDATE, UNITPRICE, REGULATORYINFO) 
                 VALUES (${data.supplierID}, ${data.itemID},${data.brandName}, ${data.availableQuantity}, ${data.period}, ${data.expiryDate}, ${data.unitPrice}, ${data.regulatoryInfo})`;
 
-    //TODO:What is remainingqunatity
+    
     sql:ParameterizedQuery[] updateQueries =
         from var data in quotationsRequireUpdate
     select `UPDATE QUOTATION 
@@ -802,9 +801,4 @@ function getDateFromString(string dateString) returns time:Date|error {
     string[] dateParts = regex:split(dateString, "/");
     time:Date date = {year: check int:fromString(dateParts[2]), month: check int:fromString(dateParts[0]), day: check int:fromString(dateParts[1])};
     return date;
-}
-
-function constructError(int line, string query) returns error {
-    string errorMessage = string `Query: ${query} failed for CSV line:${line}`;
-    return error(errorMessage);
 }
