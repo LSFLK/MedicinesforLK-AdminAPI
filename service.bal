@@ -201,7 +201,7 @@ service /admin on new http:Listener(9090) {
         aidPackageItem.packageID = packageID;
         sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY,TOTALAMOUNT)
                                         VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
-                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity}, ${<decimal>aidPackageItem.quantity*quotation.unitPrice});`;
+                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity}, ${<decimal>aidPackageItem.quantity * quotation.unitPrice});`;
         sql:ExecutionResult result = check dbClient->execute(query);
         var lastInsertedID = result.lastInsertId;
         if lastInsertedID is int {
@@ -212,7 +212,7 @@ service /admin on new http:Listener(9090) {
                      AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
                  WHERE NEEDID=${aidPackageItem.needID};`;
         _ = check dbClient->execute(query);
-        aidPackageItem.quotation=quotation;
+        aidPackageItem.quotation = quotation;
         return aidPackageItem;
     }
 
@@ -220,8 +220,44 @@ service /admin on new http:Listener(9090) {
     # + return - AidPackage-Item
     resource function put aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
+        if (packageID != aidPackageItem.packageID) {
+            return error("Mismatching package ID in request path and AidPackageItem body");
+        }
         aidPackageItem.packageID = packageID;
-        check addAidPackageItemData(aidPackageItem);
+
+        int|error aidPackageItemID = dbClient->queryRow(`SELECT PACKAGEITEMID 
+                                                            FROM AID_PACKAGE_ITEM  
+                                                            WHERE QUOTATIONID=${aidPackageItem.quotationID}
+                                                            AND NEEDID = ${aidPackageItem.needID}
+                                                            AND PACKAGEID = ${aidPackageItem.packageID}`);
+        if (aidPackageItemID is int) {
+            _ = check dbClient->execute(`UPDATE AID_PACKAGE_ITEM 
+                 SET QUANTITY=${aidPackageItem.quantity} 
+                 WHERE PACKAGEITEMID=${aidPackageItemID};`);
+        } else {
+            sql:ExecutionResult|error result = dbClient->execute(`INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, 
+                                        NEEDID, QUANTITY)
+                                        VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
+                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity});`);
+            if(result is error) {
+                return error(string `Inserting new AID Package item failed due to constraint violation`);
+            }
+            var lastInsertedID = result.lastInsertId;
+            if lastInsertedID is int {
+                aidPackageItem.packageItemID = lastInsertedID;
+            }
+        }
+
+        _ = check dbClient->execute(`UPDATE MEDICAL_NEED
+                 SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM 
+                     AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
+                 WHERE NEEDID=${aidPackageItem.needID};`);
+        aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                            QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME,
+                                                            AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                            UNITPRICE, REGULATORYINFO
+                                                            FROM QUOTATION 
+                                                            WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
         return aidPackageItem;
     }
 
