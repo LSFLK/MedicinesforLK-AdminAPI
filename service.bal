@@ -191,10 +191,17 @@ service /admin on new http:Listener(9090) {
     # + return - AidPackage-Item
     resource function post aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
+
+        Quotation quotation = check dbClient->queryRow(`SELECT
+                                                            QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME,
+                                                            AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                            UNITPRICE, REGULATORYINFO
+                                                            FROM QUOTATION 
+                                                            WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
         aidPackageItem.packageID = packageID;
-        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
+        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY,TOTALAMOUNT)
                                         VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
-                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity});`;
+                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity}, ${<decimal>aidPackageItem.quantity*quotation.unitPrice});`;
         sql:ExecutionResult result = check dbClient->execute(query);
         var lastInsertedID = result.lastInsertId;
         if lastInsertedID is int {
@@ -205,12 +212,7 @@ service /admin on new http:Listener(9090) {
                      AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
                  WHERE NEEDID=${aidPackageItem.needID};`;
         _ = check dbClient->execute(query);
-        aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                            QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME,
-                                                            AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                            UNITPRICE, REGULATORYINFO
-                                                            FROM QUOTATION 
-                                                            WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+        aidPackageItem.quotation=quotation;
         return aidPackageItem;
     }
 
@@ -437,6 +439,19 @@ service /admin on new http:Listener(9090) {
             response.setPayload("CSV File uploaded successfully");
             return response;
         }
+    }
+
+    # A resource for creating Donor
+    # + return - Donor
+    resource function post donor(@http:Payload Donor donor) returns Donor|error {
+        sql:ParameterizedQuery query = `INSERT INTO DONOR(ORGNAME, ORGLINK, EMAIL, PHONENUMBER)
+                                        VALUES (${donor.orgName}, ${donor.orgLink}, ${donor.email},${donor.phoneNumber});`;
+        sql:ExecutionResult result = check dbClient->execute(query);
+        var lastInsertedID = result.lastInsertId;
+        if lastInsertedID is int {
+            donor.donorID = lastInsertedID;
+        }
+        return donor;
     }
 }
 
