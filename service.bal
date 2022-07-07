@@ -239,7 +239,7 @@ service /admin on new http:Listener(9090) {
                                         NEEDID, QUANTITY)
                                         VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
                                                 ${aidPackageItem.needID}, ${aidPackageItem.quantity});`);
-            if(result is error) {
+            if (result is error) {
                 return error(string `Inserting new AID Package item failed due to constraint violation`);
             }
             var lastInsertedID = result.lastInsertId;
@@ -466,6 +466,7 @@ service /admin on new http:Listener(9090) {
     # + return - Return http:Response or an error
     resource function post quotations(http:Request request) returns http:Response|error {
         http:Response response = new;
+
         string[][] csvLines = check handleCSVBodyParts(request);
         Quotation[] quotations = check createQuotationFromCSVData(csvLines);
         error? ret = updateQuotationsTable(quotations);
@@ -594,43 +595,59 @@ function channelReadCsv(io:ReadableCSVChannel readableCSVChannel) returns string
     return results;
 }
 
-function readMedicalNeedsCSVLine(string[] line) returns [string, int, string, string, string, string, string, int]|error => [
+function readMedicalNeedsCSVLine(string[] line, int csvLineNo) returns [string, int, string, string, string, string, string, int]|error => [
     line[0],
-    check int:fromString(line[1].trim()),
+    check readIntCSVField(line[1], csvLineNo),
     line[2],
     line[3],
     line[4],
     line[5],
-    line[5],
-    check int:fromString(line[7].trim())
+    line[6],
+    check readIntCSVField(line[7], csvLineNo)
 ];
 
-function readSupplyQuotationsCSVLine(string[] line) returns [string, string, string, string, string, string, int, string, decimal]|error => [
+function readSupplyQuotationsCSVLine(string[] line, int csvLineNo) returns [string, string, string, string, string, string, int, string, decimal]|error => [
     line[0],
     line[1],
     line[2],
     line[3],
     line[4],
     line[5],
-    check int:fromString(line[6].trim()),
+    check readIntCSVField(line[6], csvLineNo),
     line[7],
-    check decimal:fromString(line[8].substring(1, line[8].length() - 1).trim())
+    check readDollerCSVField(line[8], csvLineNo)
 ];
+
+function readIntCSVField(string value, int csvLineNo) returns int|error {
+    int|error intVal = int:fromString(value.trim());
+    if (intVal is error) {
+        return error(string `Error in parsing int:${value} in line ${csvLineNo}`);
+    }
+    return intVal;
+}
+
+function readDollerCSVField(string value, int csvLineNo) returns decimal|error {
+    decimal|error decimalVal = decimal:fromString(value.substring(1, value.length() - 1).trim());
+    if (decimalVal is error) {
+        return error(string `Error in parsing doller amount:${value} in line ${csvLineNo}`);
+    }
+    return decimalVal;
+}
 
 function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalNeed[]|error {
     MedicalNeed[] medicalNeeds = [];
     string errorMessages = "";
-    int csvLine = 0;
+    int csvLineNo = 0;
     foreach var line in inputCSVData {
         boolean hasError = false;
         int medicalItemId = -1;
         int medicalBeneficiaryId = -1;
-        csvLine += 1;
+        csvLineNo += 1;
         if (line.length() == 8) {
-            var [_, _, urgency, period, beneficiary, itemName, _, neededQuantity] = check readMedicalNeedsCSVLine(line);
+            var [_, _, urgency, period, beneficiary, itemName, _, neededQuantity] = check readMedicalNeedsCSVLine(line, csvLineNo);
             int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemName};`);
             if (itemID is error) {
-                errorMessages = errorMessages + string `Line:${csvLine}| ${itemName} is missing in MEDICAL_ITEM table 
+                errorMessages = errorMessages + string `Line:${csvLineNo}| ${itemName} is missing in MEDICAL_ITEM table 
 `;
                 hasError = true;
             } else {
@@ -638,7 +655,7 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
             }
             int|error beneficiaryID = dbClient->queryRow(`SELECT BENEFICIARYID FROM BENEFICIARY WHERE NAME=${beneficiary};`);
             if (beneficiaryID is error) {
-                errorMessages = errorMessages + string `Line:${csvLine}| ${beneficiary} is missing in BENEFICIARY table 
+                errorMessages = errorMessages + string `Line:${csvLineNo}| ${beneficiary} is missing in BENEFICIARY table 
 `;
                 hasError = true;
             } else {
@@ -657,7 +674,7 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
             }
         }
         else {
-            log:printError(string `Invalid CSV Length in line:${csvLine}`);
+            log:printError(string `Invalid CSV Length in line:${csvLineNo}`);
         }
     }
     if (errorMessages.length() > 0) {
@@ -669,17 +686,18 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
 function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]|error {
     Quotation[] qutoations = [];
     string errorMessages = "";
-    int csvLine = 0;
+    int csvLineNo = 0;
     foreach var line in inputCSVData {
         boolean hasError = false;
         int medicalItemId = -1;
         int quotationSupplierId = -1;
-        csvLine += 1;
+        csvLineNo += 1;
         if (line.length() == 9) {
-            var [_, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, expiryDate, unitPrice] = check readSupplyQuotationsCSVLine(line);
+            var [_, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, expiryDate, unitPrice]
+                = check readSupplyQuotationsCSVLine(line, csvLineNo);
             int|error itemID = dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemNeeded};`);
             if (itemID is error) {
-                errorMessages = errorMessages + string `Line:${csvLine}| ${itemNeeded} is missing in MEDICAL_ITEM table
+                errorMessages = errorMessages + string `Line:${csvLineNo}| ${itemNeeded} is missing in MEDICAL_ITEM table
 `;
                 hasError = true;
             } else {
@@ -687,7 +705,7 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
             }
             int|error supplierID = dbClient->queryRow(`SELECT SUPPLIERID FROM SUPPLIER WHERE SHORTNAME=${supplier};`);
             if (supplierID is error) {
-                errorMessages = errorMessages + string `Line:${csvLine}| ${supplier} is missing in SUPPLIER table
+                errorMessages = errorMessages + string `Line:${csvLineNo}| ${supplier} is missing in SUPPLIER table
 `;
                 hasError = true;
             } else {
@@ -708,7 +726,7 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
             }
         }
         else {
-            log:printError(string `Invalid CSV Length in line:${csvLine}`);
+            log:printError(string `Invalid CSV Length in line:${csvLineNo}`);
         }
     }
     if (errorMessages.length() > 0) {
@@ -781,7 +799,8 @@ function updateQuotationsTable(Quotation[] quotations) returns error? {
         from var data in newquotations
     select `INSERT INTO QUOTATION 
                 (SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD, EXPIRYDATE, UNITPRICE, REGULATORYINFO) 
-                VALUES (${data.supplierID}, ${data.itemID},${data.brandName}, ${data.availableQuantity}, ${data.period}, ${data.expiryDate}, ${data.unitPrice}, ${data.regulatoryInfo})`;
+                VALUES (${data.supplierID}, ${data.itemID},${data.brandName}, ${data.availableQuantity}, ${data.period}, 
+                ${data.expiryDate}, ${data.unitPrice}, ${data.regulatoryInfo})`;
 
     sql:ParameterizedQuery[] updateQueries =
         from var data in quotationsRequireUpdate
@@ -790,7 +809,8 @@ function updateQuotationsTable(Quotation[] quotations) returns error? {
                 EXPIRYDATE = ${data.expiryDate},
                 UNITPRICE = ${data.unitPrice}, 
                 REGULATORYINFO = ${data.regulatoryInfo}
-                WHERE ITEMID = ${data.itemID} AND SUPPLIERID = ${data.supplierID} AND PERIOD = ${data.period} AND BRANDNAME =${data.brandName}`;
+                WHERE ITEMID = ${data.itemID} AND SUPPLIERID = ${data.supplierID} AND PERIOD = ${data.period} 
+                AND BRANDNAME =${data.brandName}`;
 
     transaction {
         var insertResult = dbClient->batchExecute(insertQueries);
@@ -862,6 +882,10 @@ function getMonth(string month) returns int|error {
 
 function getDateFromString(string dateString) returns time:Date|error {
     string[] dateParts = regex:split(dateString, "/");
-    time:Date date = {year: check int:fromString(dateParts[2]), month: check int:fromString(dateParts[0]), day: check int:fromString(dateParts[1])};
+    time:Date date = {
+        year: check int:fromString(dateParts[2]),
+        month: check int:fromString(dateParts[0]),
+        day: check int:fromString(dateParts[1])
+    };
     return date;
 }
