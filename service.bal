@@ -315,24 +315,28 @@ service /admin on new http:Listener(9090) {
                                                                      FROM PLEDGE;`);
         check from Pledge pledge in resultStream
             do {
+                pledge.donor = check dbClient->queryRow(`SELECT
+                                                        DONORID, ORGNAME, ORGLINK,
+                                                        EMAIL, PHONENUMBER
+                                                        FROM DONOR 
+                                                        WHERE DONORID=${pledge.donorID}`);
                 pledges.push(pledge);
             };
         check resultStream.close();
         return pledges;
     }
 
-    # A resource for fetching pledges for a given pledge ID
-    # + return - list of Pledges
-    resource function get pledges/[int pledgeID]() returns Pledge[]|error {
-        Pledge[] pledges = [];
-        stream<Pledge, error?> resultStream = dbClient->query(`SELECT PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
+    # A resource for fetching pledge for a given pledge ID
+    # + return - Pledge
+    resource function get pledges/[int pledgeID]() returns Pledge|error {
+        Pledge pledge = check dbClient->queryRow(`SELECT PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
                                                                      FROM PLEDGE WHERE PLEDGEID=${pledgeID};`);
-        check from Pledge pledge in resultStream
-            do {
-                pledges.push(pledge);
-            };
-        check resultStream.close();
-        return pledges;
+        pledge.donor = check dbClient->queryRow(`SELECT
+                                                        DONORID, ORGNAME, ORGLINK,
+                                                        EMAIL, PHONENUMBER
+                                                        FROM DONOR 
+                                                        WHERE DONORID=${pledge.donorID}`);
+        return pledge;
     }
 
     # A resource for fetching all comments of a pledge
