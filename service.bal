@@ -140,12 +140,16 @@ service /admin on new http:Listener(9090) {
     # A resource for creating Aid-Package
     # + return - Aid-Package
     resource function post aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
-        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS)
-                                        VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status});`;
-        sql:ExecutionResult result = check dbClient->execute(query);
+        sql:ExecutionResult result = check dbClient->execute(`INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS)
+                                        VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status});`);
         var lastInsertedID = result.lastInsertId;
         if lastInsertedID is int {
             aidPackage.packageID = lastInsertedID;
+        }
+
+        foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
+            aidPackageItem.packageID = aidPackage.packageID;
+            check addAidPackageItemData(aidPackageItem);
         }
         return aidPackage;
     }
@@ -215,27 +219,7 @@ service /admin on new http:Listener(9090) {
     resource function put aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
         aidPackageItem.packageID = packageID;
-        sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
-                                        VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
-                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity})
-                                        ON DUPLICATE KEY UPDATE 
-                                        QUANTITY=COALESCE(${aidPackageItem.quantity}, QUANTITY);`;
-        sql:ExecutionResult result = check dbClient->execute(query);
-        var lastInsertedID = result.lastInsertId;
-        if lastInsertedID is int {
-            aidPackageItem.packageItemID = lastInsertedID;
-        }
-        query = `UPDATE MEDICAL_NEED
-                 SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM 
-                     AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
-                 WHERE NEEDID=${aidPackageItem.needID};`;
-        _ = check dbClient->execute(query);
-        aidPackageItem.quotation = check dbClient->queryRow(`SELECT
-                                                            QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME,
-                                                            AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
-                                                            UNITPRICE, REGULATORYINFO
-                                                            FROM QUOTATION 
-                                                            WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
+        check addAidPackageItemData(aidPackageItem);
         return aidPackageItem;
     }
 
@@ -476,9 +460,31 @@ function constructAidPackageData(AidPackage aidPackage) returns error? {
     aidPackage.goalAmount = totalAmount;
     decimal|error recievedAmount = dbClient->queryRow(`SELECT IFNULL(SUM(AMOUNT),0) FROM PLEDGE 
                                                         WHERE PACKAGEID = ${aidPackage.packageID};`);
-    if(recievedAmount is decimal) {
+    if (recievedAmount is decimal) {
         aidPackage.receivedAmount = recievedAmount;
     }
+}
+
+function addAidPackageItemData(AidPackageItem aidPackageItem) returns error? {
+    sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY)
+                                        VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
+                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity});`;
+    sql:ExecutionResult result = check dbClient->execute(query);
+    var lastInsertedID = result.lastInsertId;
+    if lastInsertedID is int {
+        aidPackageItem.packageItemID = lastInsertedID;
+    }
+    query = `UPDATE MEDICAL_NEED
+                 SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM 
+                     AID_PACKAGE_ITEM WHERE NEEDID=${aidPackageItem.needID})
+                 WHERE NEEDID=${aidPackageItem.needID};`;
+    _ = check dbClient->execute(query);
+    aidPackageItem.quotation = check dbClient->queryRow(`SELECT
+                                                            QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME,
+                                                            AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+                                                            UNITPRICE, REGULATORYINFO
+                                                            FROM QUOTATION 
+                                                            WHERE QUOTATIONID=${aidPackageItem.quotationID}`);
 }
 
 function handleCSVBodyParts(http:Request request) returns string[][]|error {
