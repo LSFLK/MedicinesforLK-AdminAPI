@@ -439,8 +439,20 @@ service /admin on new http:Listener(9090) {
                                         WHERE
                                         PLEDGEID=${pledgeID} 
                                         AND PLEDGEUPDATEID=${pledgeUpdateID};`;
-        sql:ExecutionResult _ = check dbClient->execute(query);
+        _ = check dbClient->execute(query);
         return pledgeUpdateID;
+    }
+
+    # A resource for update status of a Pldege
+    # + return - pledgeUpdateID
+    resource function patch pledges/[int pledgeID]/status/[string status]() returns Pledge|error
+    {
+        _ = check dbClient->execute(`UPDATE PLEDGE 
+                                        SET STATUS = ${status}
+                                        WHERE PLEDGEID=${pledgeID};`);
+        Pledge pledge = check dbClient->queryRow(`SELECT PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
+                                                                     FROM PLEDGE WHERE PLEDGEID=${pledgeID};`);
+        return pledge;
     }
 
     # A resource for uploading medical needs CSV file
