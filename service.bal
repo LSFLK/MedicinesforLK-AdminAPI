@@ -418,6 +418,10 @@ service /admin on new http:Listener(9090) {
         }
     }
 
+    # Resource for uploading quotations
+    #
+    # + request - http:Request with the file payload
+    # + return - Return http:Response or an error
     resource function post quotations(http:Request request) returns http:Response|error {
         http:Response response = new;
         string[][] csvLines = check handleCSVBodyParts(request);
