@@ -308,7 +308,7 @@ function insertOrUpdateAidPackageItem(AidPackageItem aidPackageItem) returns err
     sql:ExecutionResult result = check dbClient->execute(`INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, 
                                         NEEDID, QUANTITY)
                                         VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
-                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity})
+                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity}
                                         ) ON DUPLICATE KEY UPDATE
                                         QUANTITY=${aidPackageItem.quantity};`);
     var lastInsertedID = result.lastInsertId;
