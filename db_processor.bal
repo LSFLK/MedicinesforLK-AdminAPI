@@ -397,7 +397,7 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
     select `INSERT INTO MEDICAL_NEED 
                 (ITEMID, BENEFICIARYID, PERIOD, NEEDEDQUANTITY, REMAININGQUANTITY, URGENCY) 
                 VALUES (${data.itemID}, ${data.beneficiaryID},
-                ${data.period}, ${data.neededQuantity}, 0, ${data.urgency})`;
+                ${data.period}, ${data.neededQuantity}, ${data.neededQuantity}, ${data.urgency})`;
 
     sql:ParameterizedQuery[] updateQueries =
         from var data in needsRequireUpdate
