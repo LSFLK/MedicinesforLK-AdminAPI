@@ -237,19 +237,12 @@ function addAidPackage(AidPackage aidPackage) returns int|error {
     return packageId;
 }
 
-function updateAidPackage(AidPackage aidPackage) returns int|error {
-    int packageId = -1;
-    sql:ExecutionResult result = check dbClient->execute(`UPDATE AID_PACKAGE
-                                        SET
+function updateAidPackage(AidPackage aidPackage) returns error? {
+    _ = check dbClient->execute(`UPDATE AID_PACKAGE SET
                                         NAME=COALESCE(${aidPackage.name},NAME), 
                                         DESCRIPTION=COALESCE(${aidPackage.description},DESCRIPTION),
                                         STATUS=COALESCE(${aidPackage.status},STATUS)
                                         WHERE PACKAGEID=${aidPackage.packageID};`);
-    var lastInsertedID = result.lastInsertId;
-    if lastInsertedID is int {
-        packageId = lastInsertedID;
-    }
-    return packageId;
 }
 
 function constructAidPackageData(AidPackage aidPackage) returns error? {
@@ -394,18 +387,18 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
 
     sql:ParameterizedQuery[] insertQueries =
         from var data in newMedicalNeed
-    select `INSERT INTO MEDICAL_NEED 
-                (ITEMID, BENEFICIARYID, PERIOD, NEEDEDQUANTITY, REMAININGQUANTITY, URGENCY) 
-                VALUES (${data.itemID}, ${data.beneficiaryID},
-                ${data.period}, ${data.neededQuantity}, ${data.neededQuantity}, ${data.urgency})`;
+        select `INSERT INTO MEDICAL_NEED 
+                    (ITEMID, BENEFICIARYID, PERIOD, NEEDEDQUANTITY, REMAININGQUANTITY, URGENCY) 
+                    VALUES (${data.itemID}, ${data.beneficiaryID},
+                    ${data.period}, ${data.neededQuantity}, ${data.neededQuantity}, ${data.urgency})`;
 
     sql:ParameterizedQuery[] updateQueries =
         from var data in needsRequireUpdate
-    select `UPDATE MEDICAL_NEED 
-                SET NEEDEDQUANTITY = ${data.neededQuantity},
-                REMAININGQUANTITY = 0 ,
-                URGENCY = ${data.urgency} 
-                WHERE ITEMID = ${data.itemID} AND BENEFICIARYID = ${data.beneficiaryID} AND PERIOD = ${data.period}`;
+        select `UPDATE MEDICAL_NEED 
+                    SET NEEDEDQUANTITY = ${data.neededQuantity},
+                    REMAININGQUANTITY = ${data.neededQuantity} ,
+                    URGENCY = ${data.urgency} 
+                    WHERE ITEMID = ${data.itemID} AND BENEFICIARYID = ${data.beneficiaryID} AND PERIOD = ${data.period}`;
     status = check updateDataInTransaction(insertQueries, updateQueries);
     statusMessageList = statusMessageList + status;
     return statusMessageList;
