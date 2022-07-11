@@ -92,9 +92,8 @@ service /admin on new http:Listener(9090) {
     # A resource for modifying an Aid-Package
     # + return - An Aid-Package
     resource function patch aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
-        int packageId = check updateAidPackage(aidPackage);
-        aidPackage.packageID = packageId;
-        AidPackageItem[] aidPackageItems = check getAidPackageItems(packageId);
+        check updateAidPackage(aidPackage);
+        AidPackageItem[] aidPackageItems = check getAidPackageItems(aidPackage.packageID ?: -1);
         foreach AidPackageItem aidPackageItem in aidPackageItems {
             aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
         }

@@ -78,7 +78,7 @@ function readSupplyQuotationsCSVLine(string[] line, int csvLineNo) returns [stri
 function readIntCSVField(string value, int csvLineNo) returns int|error {
     int|error intVal = int:fromString(value.trim());
     if (intVal is error) {
-        return error(string `Error in parsing int:${value} in line ${csvLineNo}`);
+        return error(string `Check line ${csvLineNo}, Unable to convert the value "${value}" to integer!`);
     }
     return intVal;
 }
@@ -86,7 +86,7 @@ function readIntCSVField(string value, int csvLineNo) returns int|error {
 function readDollerCSVField(string value, int csvLineNo) returns decimal|error {
     decimal|error decimalVal = decimal:fromString(value.substring(1, value.length() - 1).trim());
     if (decimalVal is error) {
-        return error(string `Error in parsing doller amount:${value} in line ${csvLineNo}`);
+        return error(string `Check line ${csvLineNo}, Unable to convert doller amount:${value}`);
     }
     return decimalVal;
 }
