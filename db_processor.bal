@@ -121,6 +121,17 @@ function createDonor(Donor donor) returns Donor|error {
     return donor;
 }
 
+function getDonors() returns Donor[]|error {
+    Donor[] donors = [];
+    stream<Donor, error?> resultStream = dbClient->query(`SELECT DONORID, ORGNAME, ORGLINK, EMAIL, PHONENUMBER FROM DONOR`);
+    check from Donor donor in resultStream
+        do {
+            donors.push(donor);
+        };
+    check resultStream.close();
+    return donors;
+}
+
 //Pledge
 function getPledges(int? packageId = ()) returns Pledge[]|error {
     Pledge[] pledges = [];
@@ -377,8 +388,7 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
             newMedicalNeed.push(medicalNeed);
         }
     }
-    string status = string `Total Medical Needs Count in file:${medicalNeeds.length()}|Requre Update:${needsRequireUpdate.length()} |New Needs:${newMedicalNeed.length()}
-`;
+    string status = string `Total Medical Needs Count in file:${medicalNeeds.length()}, Needs require update:${needsRequireUpdate.length()}, New needs:${newMedicalNeed.length()}${"\n"}`;
     log:printInfo(status);
     statusMessageList = statusMessageList + status;
 
@@ -415,8 +425,7 @@ function updateQuotationsTable(Quotation[] quotations) returns string|error {
             newquotations.push(quotation);
         }
     }
-    string status = string `Total Quotations count in file:${quotations.length()}|Requre Update:${quotationsRequireUpdate.length()} |New Needs:${newquotations.length()}
-`;
+    string status = string `Total Quotations count in file:${quotations.length()}, Quotations require update:${quotationsRequireUpdate.length()}, New quotations:${newquotations.length()}${"\n"}`;
     log:printInfo(status);
     statusMessageList = statusMessageList + status;
     sql:ParameterizedQuery[] insertQueries =
@@ -462,7 +471,7 @@ function updateDataInTransaction(sql:ParameterizedQuery[] insertQueries, sql:Par
             }
             int totalInsertAffectedRowCount = calculateAffectedRowCountByBatchUpdate(insertResult);
             int totalUpdateAffectedRowCount = calculateAffectedRowCountByBatchUpdate(updateResult);
-            status = string `Newly added row count to DB: ${totalInsertAffectedRowCount} |Updated Row Count in DB: ${totalUpdateAffectedRowCount}`;
+            status = string `DB Update status: New row count: ${totalInsertAffectedRowCount}, Updated Row Count: ${totalUpdateAffectedRowCount}`;
         }
     }
     return status;
@@ -482,12 +491,12 @@ function calculateAffectedRowCountByBatchUpdate(sql:ExecutionResult[]|error batc
 function generateTransactionErrorMessage(sql:ExecutionResult[]|error insertResult,
         sql:ExecutionResult[]|error updateResult) returns string {
 
-    string message = "Data upload transaction failed: ";
+    string message = "Data upload transaction failed!";
     if (insertResult is error) {
-        message = message + "|Insert batch error: " + insertResult.message();
+        message = message + "Insert batch error: " + insertResult.message() + "\n";
     }
     if (updateResult is error) {
-        message = message + "|Update batch error: " + updateResult.message();
+        message = message + "Update batch error: " + updateResult.message() + "\n";
     }
     return message;
 }

@@ -43,6 +43,14 @@ service /admin on new http:Listener(9090) {
         return createDonor(donor);
     }
 
+    resource function get donors/[int donorId]() returns Donor|error {
+        return getDonor(donorId);
+    }
+
+    resource function get donors() returns Donor[]|error {
+        return getDonors();
+    }
+
     # A resource for creating  quotation
     # + return - A quotation
     resource function post quotation(@http:Payload Quotation quotation) returns Quotation|error {
@@ -209,7 +217,7 @@ service /admin on new http:Listener(9090) {
         if ret is error {
             return ret;
         } else {
-            response.setPayload("CSV File uploaded successfully: " + ret);
+            response.setPayload("CSV File uploaded successfully!\n" + ret);
             return response;
         }
     }
@@ -226,7 +234,7 @@ service /admin on new http:Listener(9090) {
         if ret is error {
             return ret;
         } else {
-            response.setPayload("CSV File uploaded successfully: " + ret);
+            response.setPayload("CSV File uploaded successfully!\n" + ret);
             return response;
         }
     }
