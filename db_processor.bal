@@ -256,6 +256,7 @@ function constructAidPackageData(AidPackage aidPackage) returns error? {
         Quotation quotation = check getQuotation(aidPackageItem.quotationID);
         quotation.supplier = check getSupplier(quotation.supplierID);
         aidPackageItem.quotation = quotation;
+        aidPackageItem.totalAmount = <decimal>aidPackageItem.quantity * quotation.unitPrice;
         totalAmount = totalAmount + aidPackageItem.totalAmount;
     }
     aidPackage.goalAmount = totalAmount;
