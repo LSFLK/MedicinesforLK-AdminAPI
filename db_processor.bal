@@ -383,7 +383,6 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
         }
     }
     string status = string `Total Medical Needs Count in file:${medicalNeeds.length()}, Needs require update:${needsRequireUpdate.length()}, New needs:${newMedicalNeed.length()}${"\n"}`;
-    log:printInfo(status);
     statusMessageList = statusMessageList + status;
 
     sql:ParameterizedQuery[] insertQueries =
@@ -400,9 +399,10 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
                     REMAININGQUANTITY = ${data.neededQuantity} ,
                     URGENCY = ${data.urgency} 
                     WHERE ITEMID = ${data.itemID} AND BENEFICIARYID = ${data.beneficiaryID} AND PERIOD = ${data.period}`;
-    status = check updateDataInTransaction(insertQueries, updateQueries);
-    statusMessageList = statusMessageList + status;
-    return statusMessageList;
+    string ret = check updateDataInTransaction(insertQueries, updateQueries);
+    statusMessageList = statusMessageList + ret;
+    log:printInfo(statusMessageList);
+    return status;
 }
 
 function updateQuotationsTable(Quotation[] quotations) returns string|error {
@@ -420,7 +420,6 @@ function updateQuotationsTable(Quotation[] quotations) returns string|error {
         }
     }
     string status = string `Total Quotations count in file:${quotations.length()}, Quotations require update:${quotationsRequireUpdate.length()}, New quotations:${newquotations.length()}${"\n"}`;
-    log:printInfo(status);
     statusMessageList = statusMessageList + status;
     sql:ParameterizedQuery[] insertQueries =
         from var data in newquotations
@@ -436,11 +435,11 @@ function updateQuotationsTable(Quotation[] quotations) returns string|error {
                 EXPIRYDATE = ${data.expiryDate},
                 UNITPRICE = ${data.unitPrice}, 
                 REGULATORYINFO = ${data.regulatoryInfo}
-                WHERE ITEMID = ${data.itemID} AND SUPPLIERID = ${data.supplierID} AND PERIOD = ${data.period} 
-                AND BRANDNAME =${data.brandName}`;
-    status = check updateDataInTransaction(insertQueries, updateQueries);
-    statusMessageList = statusMessageList + status;
-    return statusMessageList;
+                WHERE ITEMID = ${data.itemID} AND SUPPLIERID = ${data.supplierID} AND PERIOD = ${data.period}`;
+    string ret = check updateDataInTransaction(insertQueries, updateQueries);
+    statusMessageList = statusMessageList + ret;
+    log:printInfo(statusMessageList);
+    return status;
 }
 
 function updateDataInTransaction(sql:ParameterizedQuery[] insertQueries, sql:ParameterizedQuery[] updateQueries) returns string|error {
@@ -485,12 +484,14 @@ function calculateAffectedRowCountByBatchUpdate(sql:ExecutionResult[]|error batc
 function generateTransactionErrorMessage(sql:ExecutionResult[]|error insertResult,
         sql:ExecutionResult[]|error updateResult) returns string {
 
-    string message = "Data upload transaction failed!";
-    if (insertResult is error) {
-        message = message + "Insert batch error: " + insertResult.message() + "\n";
+    string message = "Data upload transaction failed,";
+    if (insertResult is sql:BatchExecuteError) {
+        message = message + " with insert batch error! \n ";
+        log:printError("Upload transaction failed:", insertResult);
     }
-    if (updateResult is error) {
-        message = message + "Update batch error: " + updateResult.message() + "\n";
+    if (updateResult is sql:BatchExecuteError) {
+        message = message + " with update batch error! \n ";
+        log:printError("Upload transaction failed:", updateResult);
     }
     return message;
 }

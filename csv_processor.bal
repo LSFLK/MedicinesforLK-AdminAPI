@@ -162,6 +162,9 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
         int medicalItemId = -1;
         int medicalBeneficiaryId = -1;
         csvLineNo += 1;
+        if (csvLineNo == 1) {
+            continue; // Medical needs csv has empty line at the beginning, skipping it.
+        }
         if (line.length() == 8) {
             var [_, _, urgency, period, beneficiary, itemName, _, neededQuantity] = check readMedicalNeedsCSVLine(line, csvLineNo);
             int|error itemID = getMedicalItemId(itemName);

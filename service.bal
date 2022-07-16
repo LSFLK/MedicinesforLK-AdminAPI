@@ -199,7 +199,6 @@ service /admin on new http:Listener(9090) {
     resource function put pledges/[int pledgeID]/updatecomment(@http:Payload PledgeUpdate pledgeUpdate) returns PledgeUpdate?|error {
         pledgeUpdate.pledgeID = pledgeID;
         check insertOrUpdatePledgeUpdate(pledgeUpdate);
-
         pledgeUpdate.dateTime = check getPledgeUpdateLUT(pledgeUpdate.pledgeUpdateID);
         return pledgeUpdate;
     }
@@ -209,15 +208,15 @@ service /admin on new http:Listener(9090) {
     # + request - http:Request with the file payload
     # + return - Return http:Response or an error
     resource function post requirements/medicalneeds(http:Request request) returns http:Response|error {
-        http:Response response = new;
-        string[][] csvLines = check handleCSVBodyParts(request);
-        MedicalNeed[] medicalNeeds = check createMedicalNeedsFromCSVData(csvLines);
-        string|error ret = updateMedicalNeedsTable(medicalNeeds);
-        if ret is error {
-            return ret;
-        } else {
-            response.setPayload("CSV File uploaded successfully!\n" + ret);
+        do {
+            http:Response response = new;
+            string[][] csvLines = check handleCSVBodyParts(request);
+            MedicalNeed[] medicalNeeds = check createMedicalNeedsFromCSVData(csvLines);
+            string status = check updateMedicalNeedsTable(medicalNeeds);
+            response.setPayload("CSV File uploaded successfully!\n" + status);
             return response;
+        } on fail var e {
+            return e;
         }
     }
 
@@ -226,15 +225,15 @@ service /admin on new http:Listener(9090) {
     # + request - http:Request with the file payload
     # + return - Return http:Response or an error
     resource function post quotations(http:Request request) returns http:Response|error {
-        http:Response response = new;
-        string[][] csvLines = check handleCSVBodyParts(request);
-        Quotation[] quotations = check createQuotationFromCSVData(csvLines);
-        string|error ret = updateQuotationsTable(quotations);
-        if ret is error {
-            return ret;
-        } else {
-            response.setPayload("CSV File uploaded successfully!\n" + ret);
+        do {
+            http:Response response = new;
+            string[][] csvLines = check handleCSVBodyParts(request);
+            Quotation[] quotations = check createQuotationFromCSVData(csvLines);
+            string status = check updateQuotationsTable(quotations);
+            response.setPayload("CSV File uploaded successfully!\n" + status);
             return response;
+        } on fail var e {
+            return e;
         }
     }
 }
