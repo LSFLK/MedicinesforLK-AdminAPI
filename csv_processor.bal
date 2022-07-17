@@ -84,7 +84,7 @@ function readIntCSVField(string value, int csvLineNo) returns int|error {
 }
 
 function readDollerCSVField(string value, int csvLineNo) returns decimal|error {
-    decimal|error decimalVal = decimal:fromString(value.substring(1, value.length() - 1).trim());
+    decimal|error decimalVal = decimal:fromString(value.substring(1, value.length()).trim());
     if (decimalVal is error) {
         return error(string `Check line ${csvLineNo}, Unable to convert doller amount:${value}`);
     }
