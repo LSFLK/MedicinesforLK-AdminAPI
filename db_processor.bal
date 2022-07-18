@@ -267,7 +267,7 @@ function constructAidPackageData(AidPackage aidPackage) returns error? {
 function getAidPackageItems(int packageId) returns AidPackageItem[]|error {
     AidPackageItem[] aidPackageItems = [];
     stream<AidPackageItem, error?> resultStream = dbClient->query(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
-                                                                               NEEDID, QUANTITY, TOTALAMOUNT 
+                                                                               NEEDID, INITIALQUANTITY, QUANTITY, TOTALAMOUNT 
                                                                                FROM AID_PACKAGE_ITEM
                                                                                WHERE PACKAGEID=${packageId};`);
     check from AidPackageItem aidPackageItem in resultStream
@@ -280,9 +280,9 @@ function getAidPackageItems(int packageId) returns AidPackageItem[]|error {
 
 function addAidPackageItem(AidPackageItem aidPackageItem) returns int|error {
     int aidPackageItemId = -1;
-    sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, QUANTITY,TOTALAMOUNT)
+    sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, INITIALQUANTITY, QUANTITY,TOTALAMOUNT)
                                         VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
-                                        ${aidPackageItem.needID}, ${aidPackageItem.quantity}, ${aidPackageItem.totalAmount});`;
+                                        ${aidPackageItem.needID}, ${aidPackageItem.quantity}, ${aidPackageItem.quantity}, ${aidPackageItem.totalAmount});`;
     sql:ExecutionResult result = check dbClient->execute(query);
     var lastInsertedID = result.lastInsertId;
     if lastInsertedID is int {
@@ -306,12 +306,30 @@ function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
 }
 
 function insertOrUpdateAidPackageItem(AidPackageItem aidPackageItem) returns error? {
-    sql:ExecutionResult result = check dbClient->execute(`INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, 
-                                        NEEDID, QUANTITY)
-                                        VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},
-                                                ${aidPackageItem.needID}, ${aidPackageItem.quantity}
+    AidPackage aidPackage = check getAidPackage(<int>aidPackageItem.packageID);
+    Quotation quotation = check getQuotation(aidPackageItem.quotationID);
+    aidPackageItem.quotation = quotation;
+    aidPackageItem.totalAmount = <decimal>aidPackageItem.quantity * quotation.unitPrice;
+    sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, 
+                                        NEEDID, INITIALQUANTITY, QUANTITY, TOTALAMOUNT)
+                                        VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},${aidPackageItem.needID},
+                                                 ${aidPackageItem.quantity}, ${aidPackageItem.quantity}, ${aidPackageItem.totalAmount}
                                         ) ON DUPLICATE KEY UPDATE
-                                        QUANTITY=${aidPackageItem.quantity};`);
+                                        QUANTITY=${aidPackageItem.quantity},
+                                        TOTALAMOUNT=${aidPackageItem.totalAmount};`;
+    
+    if (aidPackage.status == "Draft") {
+        query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, 
+                                        NEEDID, INITIALQUANTITY, QUANTITY, TOTALAMOUNT)
+                                         VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},${aidPackageItem.needID},
+                                                 ${aidPackageItem.quantity}, ${aidPackageItem.quantity}, ${aidPackageItem.totalAmount}
+                                        ) ON DUPLICATE KEY UPDATE
+                                        INITIALQUANTITY=${aidPackageItem.quantity},
+                                        QUANTITY=${aidPackageItem.quantity},
+                                        TOTALAMOUNT=${aidPackageItem.totalAmount};`;
+    
+    }
+    sql:ExecutionResult result = check dbClient->execute(query);
     var lastInsertedID = result.lastInsertId;
     if lastInsertedID is int {
         aidPackageItem.packageItemID = lastInsertedID;
@@ -354,6 +372,35 @@ function deleteAidPackageUpdate(int packageId, int packageUpdateId) returns erro
 
 function getAidPackageUpdateLUT(int? packageUpdateId) returns string|error {
     return check dbClient->queryRow(`SELECT DATETIME FROM AID_PACKAGE_UPDATE WHERE PACKAGEUPDATEID=${packageUpdateId};`);
+}
+
+//Check Medical Need Quantity
+function checkMedicalNeedQuantityAvailable(AidPackageItem aidPackageItem) returns boolean|error {
+    int aidPakageExistCount = check dbClient->queryRow(`SELECT count(PACKAGEITEMID) FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${aidPackageItem.packageID} AND QUOTATIONID=${aidPackageItem.quotationID} AND NEEDID=${aidPackageItem.needID};`);
+    if (aidPakageExistCount == 0) {
+        int quantityAvailableCheck = check dbClient->queryRow(`SELECT REMAININGQUANTITY>=${aidPackageItem.quantity} FROM MEDICAL_NEED WHERE NEEDID=${aidPackageItem.needID};`);
+        log:printInfo("quantityAvailable" + quantityAvailableCheck.toString());
+        if (quantityAvailableCheck == 0) {
+            return false;
+        } else {
+            return true;
+        }
+    } else {
+        int oldQuantity = check dbClient->queryRow(`SELECT QUANTITY FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${aidPackageItem.packageID} AND QUOTATIONID=${aidPackageItem.quotationID} AND NEEDID=${aidPackageItem.needID};`);
+        if (oldQuantity < aidPackageItem.quantity) {
+            int quantityAvailableCheck = check dbClient->queryRow(`SELECT REMAININGQUANTITY>=${aidPackageItem.quantity - oldQuantity} FROM MEDICAL_NEED WHERE NEEDID=${aidPackageItem.needID};`);
+            log:printInfo("quantityAvailable" + quantityAvailableCheck.toString());
+            if (quantityAvailableCheck == 0) {
+                return false;
+            } else {
+                return true;
+            }
+        } else {
+            return true;
+        }
+
+    }
+
 }
 
 //Update Medical Need Quantity

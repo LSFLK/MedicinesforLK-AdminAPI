@@ -74,6 +74,7 @@ type AidPackageItem record {
     int? packageID = ();
     int quotationID;
     int needID;
+    int initialQuantity = 0;
     int quantity;
     decimal totalAmount = 0;
     Quotation? quotation = ();

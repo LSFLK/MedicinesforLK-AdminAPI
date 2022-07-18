@@ -105,8 +105,12 @@ service /admin on new http:Listener(9090) {
     # + return - AidPackage-Item
     resource function post aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
-        check constructAidPAckageItem(packageID, aidPackageItem);
-        return aidPackageItem;
+        if (check checkMedicalNeedQuantityAvailable(aidPackageItem)) {
+            check constructAidPAckageItem(packageID, aidPackageItem);
+            return aidPackageItem;
+        }else {
+            return error 'error("Medical Need Remaining Amount Exceeds Aid Package Item Amount");
+        }
     }
 
     # A resource for updating AidPackage-Item
@@ -114,10 +118,15 @@ service /admin on new http:Listener(9090) {
     resource function put aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
         aidPackageItem.packageID = packageID;
-        check insertOrUpdateAidPackageItem(aidPackageItem);
-        check updateMedicalNeedQuantity(aidPackageItem.needID);
-        aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
-        return aidPackageItem;
+        if (check checkMedicalNeedQuantityAvailable(aidPackageItem)) {
+            check insertOrUpdateAidPackageItem(aidPackageItem);
+            check updateMedicalNeedQuantity(aidPackageItem.needID);
+            aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
+            return aidPackageItem;
+        } else {
+            return error 'error("Medical Need Remaining Amount Exceeds Aid Package Item Amount");
+        }
+
     }
 
     # A resource for removing an AidPackage-Item
