@@ -105,11 +105,15 @@ service /admin on new http:Listener(9090) {
     # + return - AidPackage-Item
     resource function post aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
-        if (check checkMedicalNeedQuantityAvailable(aidPackageItem)) {
-            check constructAidPAckageItem(packageID, aidPackageItem);
-            return aidPackageItem;
-        }else {
-            return error 'error("Medical Need Remaining Amount Exceeds Aid Package Item Amount");
+        if (check checkPeriodNeedandQuotation(aidPackageItem.needID, aidPackageItem.quotationID)) {
+            if (check checkMedicalNeedQuantityAvailable(aidPackageItem)) {
+                check constructAidPAckageItem(packageID, aidPackageItem);
+                return aidPackageItem;
+            } else {
+                return error 'error("Medical Need Remaining Amount Exceeds Aid Package Item Amount");
+            }
+        } else {
+            return error 'error("Medical Need and Qutation, Period Mismatch");
         }
     }
 
@@ -117,14 +121,18 @@ service /admin on new http:Listener(9090) {
     # + return - AidPackage-Item
     resource function put aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
-        aidPackageItem.packageID = packageID;
-        if (check checkMedicalNeedQuantityAvailable(aidPackageItem)) {
-            check insertOrUpdateAidPackageItem(aidPackageItem);
-            check updateMedicalNeedQuantity(aidPackageItem.needID);
-            aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
-            return aidPackageItem;
+        if (check checkPeriodNeedandQuotation(aidPackageItem.needID, aidPackageItem.quotationID)) {
+            aidPackageItem.packageID = packageID;
+            if (check checkMedicalNeedQuantityAvailable(aidPackageItem)) {
+                check insertOrUpdateAidPackageItem(aidPackageItem);
+                check updateMedicalNeedQuantity(aidPackageItem.needID);
+                aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
+                return aidPackageItem;
+            } else {
+                return error 'error("Medical Need Remaining Amount Exceeds Aid Package Item Amount");
+            }
         } else {
-            return error 'error("Medical Need Remaining Amount Exceeds Aid Package Item Amount");
+            return error 'error("Medical Need and Qutation, Period Mismatch");
         }
 
     }

@@ -15,6 +15,11 @@ function getMedicalNeeds() returns MedicalNeed[]|error {
     return medicalNeeds;
 }
 
+//Medical Need
+function getMedicalNeed(int itemId) returns MedicalNeed|error {
+    return check dbClient->queryRow(`SELECT ITEMID, NEEDID, PERIOD, URGENCY, NEEDEDQUANTITY, BENEFICIARYID, REMAININGQUANTITY FROM MEDICAL_NEED WHERE ITEMID=${itemId}`);
+}
+
 //Medical Item
 function getMedicalItem(int itemId) returns MedicalItem|error {
     return check dbClient->queryRow(`SELECT ITEMID, NAME, TYPE, UNIT FROM MEDICAL_ITEM WHERE ITEMID=${itemId}`);
@@ -255,6 +260,9 @@ function constructAidPackageData(AidPackage aidPackage) returns error? {
     foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
         Quotation quotation = check getQuotation(aidPackageItem.quotationID);
         quotation.supplier = check getSupplier(quotation.supplierID);
+        MedicalNeed medicalNeed = check getMedicalNeed(quotation.supplierID);
+        aidPackageItem.period = medicalNeed.period;
+        aidPackageItem.period.day = 1;
         aidPackageItem.quotation = quotation;
         aidPackageItem.totalAmount = <decimal>aidPackageItem.quantity * quotation.unitPrice;
         totalAmount = totalAmount + aidPackageItem.totalAmount;
@@ -541,4 +549,13 @@ function generateTransactionErrorMessage(sql:ExecutionResult[]|error insertResul
         log:printError("Upload transaction failed:", updateResult);
     }
     return message;
+}
+
+function checkPeriodNeedandQuotation(int needid,int quotationID) returns boolean|error {
+    MedicalNeed medicalNeed=check getMedicalNeed(needid);
+    Quotation quotation=check getQuotation(quotationID);
+    if(medicalNeed.period== quotation.period){
+        return true;
+    }
+    return false;
 }
