@@ -16,8 +16,8 @@ function getMedicalNeeds() returns MedicalNeed[]|error {
 }
 
 //Medical Need
-function getMedicalNeed(int itemId) returns MedicalNeed|error {
-    return check dbClient->queryRow(`SELECT ITEMID, NEEDID, PERIOD, URGENCY, NEEDEDQUANTITY, BENEFICIARYID, REMAININGQUANTITY FROM MEDICAL_NEED WHERE ITEMID=${itemId}`);
+function getMedicalNeed(int needId) returns MedicalNeed|error {
+    return check dbClient->queryRow(`SELECT ITEMID, NEEDID, PERIOD, URGENCY, NEEDEDQUANTITY, BENEFICIARYID, REMAININGQUANTITY FROM MEDICAL_NEED WHERE NEEDID=${needId}`);
 }
 
 //Medical Item
