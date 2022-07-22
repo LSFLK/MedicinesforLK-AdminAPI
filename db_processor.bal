@@ -260,7 +260,7 @@ function constructAidPackageData(AidPackage aidPackage) returns error? {
     foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
         Quotation quotation = check getQuotation(aidPackageItem.quotationID);
         quotation.supplier = check getSupplier(quotation.supplierID);
-        MedicalNeed medicalNeed = check getMedicalNeed(quotation.supplierID);
+        MedicalNeed medicalNeed = check getMedicalNeed(aidPackageItem.needID);
         aidPackageItem.period = medicalNeed.period;
         aidPackageItem.period.day = 1;
         aidPackageItem.quotation = quotation;
