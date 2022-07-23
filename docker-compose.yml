@@ -12,6 +12,7 @@ services:
     volumes: 
       - "./:/home"
       - "./target:/app/target"
+      - "./Dependencies.toml:/app/Dependencies.toml"
     networks:
       medicinesforlk-network:
         ipv4_address: 172.16.238.10
