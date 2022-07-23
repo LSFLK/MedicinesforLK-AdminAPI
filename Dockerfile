@@ -6,4 +6,4 @@ RUN mkdir /home/ballerina/.ballerina
 
 EXPOSE 443
 
-ENTRYPOINT ["bal", "run"]dock
+ENTRYPOINT ["bal", "run"]
