@@ -4,6 +4,6 @@ COPY . /app
 WORKDIR /app
 RUN mkdir /home/ballerina/.ballerina
 
-EXPOSE 443
+EXPOSE 9090
 
 ENTRYPOINT ["bal", "run"]
