@@ -27,7 +27,8 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - "./mysql-scripts/creation-ddl.sql:/docker-entrypoint-initdb.d/1.sql"
+      - "./mysql-scripts/create-database.sql:/docker-entrypoint-initdb.d/1.sql"
+      - "./mysql-scripts/creation-ddl.sql:/docker-entrypoint-initdb.d/2.sql"
     networks:
       medicinesforlk-network:
         ipv4_address: 172.16.238.11

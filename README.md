@@ -5,8 +5,8 @@ The medicines LK app is comprised of a [React Frontend](https://github.com/LSFLK
 ### Development
 
 - [Set up Ballerina](https://ballerina.io/learn/install-ballerina/set-up-ballerina/)
-- Run a MySQL server and execute the script `mysql-scripts/creation-ddl.sql` on it to bring up the DDL for the db.
-- Modify `config.bal` with the values for the MySQL server you set up.
+- Run a MySQL server and execute the script `mysql-scripts/creation-ddl.sql` on it to bring up the DDL for the db. You need to have a `medicinesforlk` db in your MySQL server to set up the DDL in.
+- Modify `config.bal` with the values for the MySQL server you set up. 
 - `bal run`
 
 ### Run using Docker Compose
