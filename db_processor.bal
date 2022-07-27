@@ -2,6 +2,8 @@ import ballerina/sql;
 import ballerina/time;
 import ballerina/log;
 
+const TIME_ZONE = "Asia/Colombo";
+
 //Medical Needs
 function getMedicalNeeds() returns MedicalNeed[]|error {
     MedicalNeed[] medicalNeeds = [];
@@ -182,13 +184,14 @@ function deletePledgeUpdate(int pledgeId, int pledgeUpdateId) returns error? {
 }
 
 function insertOrUpdatePledgeUpdate(PledgeUpdate pledgeUpdate) returns error? {
+    int currentTime = check getCurrentTimeZoneTime();
     sql:ParameterizedQuery query = `INSERT INTO PLEDGE_UPDATE(PLEDGEID, PLEDGEUPDATEID, UPDATECOMMENT, DATETIME)
                                         VALUES (${pledgeUpdate.pledgeID},
                                                 IFNULL(${pledgeUpdate.pledgeUpdateID}, DEFAULT(PLEDGEUPDATEID)),
                                                 ${pledgeUpdate.updateComment},
-                                                FROM_UNIXTIME(${time:utcNow()[0]})
+                                                FROM_UNIXTIME(${currentTime})
                                         ) ON DUPLICATE KEY UPDATE
-                                        DATETIME=FROM_UNIXTIME(COALESCE(${time:utcNow()[0]}, DATETIME)),
+                                        DATETIME=FROM_UNIXTIME(COALESCE(${currentTime}, DATETIME)),
                                         UPDATECOMMENT=COALESCE(${pledgeUpdate.updateComment}, UPDATECOMMENT);`;
     sql:ExecutionResult result = check dbClient->execute(query);
     var lastInsertedID = result.lastInsertId;
@@ -346,13 +349,14 @@ function getAidPackageUpdate(int packageId) returns AidPackageUpdate[]|error {
 }
 
 function insertOrUpdateAidPackageUpdate(AidPackageUpdate aidPackageUpdate) returns error? {
+    int currentTime = check getCurrentTimeZoneTime();
     sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
                                         VALUES (${aidPackageUpdate.packageID},
                                                 IFNULL(${aidPackageUpdate.packageUpdateID}, DEFAULT(PACKAGEUPDATEID)),
                                                 ${aidPackageUpdate.updateComment},
-                                                FROM_UNIXTIME(${time:utcNow()[0]})
+                                                FROM_UNIXTIME(${currentTime})
                                         ) ON DUPLICATE KEY UPDATE
-                                        DATETIME=FROM_UNIXTIME(COALESCE(${time:utcNow()[0]}, DATETIME)),
+                                        DATETIME=FROM_UNIXTIME(COALESCE(${currentTime}, DATETIME)),
                                         UPDATECOMMENT=COALESCE(${aidPackageUpdate.updateComment}, UPDATECOMMENT);`;
     sql:ExecutionResult result = check dbClient->execute(query);
     var lastInsertedID = result.lastInsertId;
@@ -546,4 +550,17 @@ function checkPeriodNeedandQuotation(int needid,int quotationID) returns boolean
         return true;
     }
     return false;
+}
+
+function getCurrentTimeZoneTime() returns int|error {
+    time:Utc currentTimeUtc = time:utcNow();
+    time:Zone? zone = time:getZone(TIME_ZONE);
+    if zone == () {
+        return error("Invalid time zone");
+    }
+    time:Utc|error timeZoneTime = zone.utcFromCivil(time:utcToCivil(currentTimeUtc));
+    if timeZoneTime is error {
+        return error("Failed to convert utc to time zone", timeZoneTime);
+    }
+    return timeZoneTime[0];
 }
