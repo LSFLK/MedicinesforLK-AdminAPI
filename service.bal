@@ -37,13 +37,7 @@ service /admin on new http:Listener(9090) {
         return addSupplier(supplier);
     }
 
-    # A resource for creating a donor
-    # + return - A donor
-    resource function post donor(@http:Payload Donor donor) returns Donor|error {
-        return createDonor(donor);
-    }
-
-    resource function get donors/[int donorId]() returns Donor|error {
+    resource function get donors/[string donorId]() returns Donor|error {
         return getDonor(donorId);
     }
 
