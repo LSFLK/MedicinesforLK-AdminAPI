@@ -91,10 +91,9 @@ type AidPackageUpdate record {
 type Pledge record {
     int? pledgeID = ();
     int packageID;
-    int donorID;
+    string donorID;
     decimal amount;
     string status;
-    Donor? donor;
 };
 
 type PledgeUpdate record {
