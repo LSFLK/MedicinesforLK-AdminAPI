@@ -1,0 +1,44 @@
+version: "3.5"
+
+services:
+  medicinesforlk-adminapi:
+    build:
+      context: ./
+    restart: unless-stopped
+    container_name: medicinesforlk-adminapi
+    image: medicinesforlk-adminapi
+    ports:
+      - "9090:9090"
+    volumes: 
+      - "./:/home"
+      - "./target:/app/target"
+      - "./Dependencies.toml:/app/Dependencies.toml"
+    networks:
+      medicinesforlk-network:
+        ipv4_address: 172.16.238.10
+
+
+  mysql:
+    image: mysql
+    container_name: medicinesforlk-mysql
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - "./mysql-scripts/create-database.sql:/docker-entrypoint-initdb.d/1.sql"
+      - "./mysql-scripts/creation-ddl.sql:/docker-entrypoint-initdb.d/2.sql"
+    networks:
+      medicinesforlk-network:
+        ipv4_address: 172.16.238.11
+
+
+networks:
+  medicinesforlk-network:
+    name: medicinesforlk-network
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.238.0/24
