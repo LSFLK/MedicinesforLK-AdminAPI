@@ -131,6 +131,16 @@ service /admin on new http:Listener(9090) {
 
     }
 
+    # A resource for removing an AidPackage
+    # + return - aidPackageId
+    resource function delete aidpackages/[int packageID]() returns int|error {
+        AidPackageItem[] aidPackageItems = check getAidPackageItems(packageID);
+        foreach AidPackageItem aidPackageItem in aidPackageItems {
+            check deleteAidPackageItem(packageID, <int> aidPackageItem.packageItemID);
+        }
+        return packageID;
+    }
+
     # A resource for removing an AidPackage-Item
     # + return - aidPackageItem
     resource function delete aidpackages/[int packageID]/aidpackageitems/[int packageItemID]() returns int|error {
