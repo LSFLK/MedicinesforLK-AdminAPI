@@ -37,18 +37,13 @@ service /admin on new http:Listener(9090) {
         return addSupplier(supplier);
     }
 
-    # A resource for creating a donor
-    # + return - A donor
-    resource function post donor(@http:Payload Donor donor) returns Donor|error {
-        return createDonor(donor);
-    }
-
-    resource function get donors/[int donorId]() returns Donor|error {
-        return getDonor(donorId);
-    }
-
-    resource function get donors() returns Donor[]|error {
-        return getDonors();
+    # A resource to retrieve all donors.
+    # 
+    # + pageNumber - Current page number
+    # + pageCount - Maximum number of results expected per page
+    # + return - List of donors
+    resource function get donors(int pageNumber = 0, int pageCount = defaultPageCount) returns Donor[]|error {
+        return getDonors(pageNumber, pageCount);
     }
 
     # A resource for creating  quotation

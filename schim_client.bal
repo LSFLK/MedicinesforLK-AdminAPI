@@ -74,7 +74,8 @@ final http:Client schimClientEp = check new(schimEndpoint,
     }
 );
 
-isolated function getDonors(int startIdx, int pageCount) returns Donor[]|error {
+isolated function getDonors(int pageNumber, int pageCount) returns Donor[]|error {
+    int startIdx = pageNumber == 0 ? 1: pageCount + (pageNumber - 1 * pageCount);
     SchimUserSearchRequest requestPayload = {
         filter: "groups eq donor",
         domain: userDomain,
