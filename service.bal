@@ -38,7 +38,7 @@ service /admin on new http:Listener(9090) {
     }
 
     # A resource to retrieve all donors.
-    # 
+    #
     # + pageNumber - Current page number
     # + pageCount - Maximum number of results expected per page
     # + return - List of donors
