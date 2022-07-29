@@ -110,33 +110,6 @@ function getMatchingQuotatonsForMedicalNeed(MedicalNeed medicalNeed) returns Quo
     return quotations;
 }
 
-//Donor
-function getDonor(int donorId) returns Donor|error {
-    return check dbClient->queryRow(`SELECT DONORID, ORGNAME, ORGLINK, EMAIL, PHONENUMBER FROM DONOR 
-                                        WHERE DONORID=${donorId}`);
-}
-
-function createDonor(Donor donor) returns Donor|error {
-    sql:ExecutionResult result = check dbClient->execute(`INSERT INTO DONOR(ORGNAME, ORGLINK, EMAIL, PHONENUMBER)
-                                        VALUES (${donor.orgName}, ${donor.orgLink}, ${donor.email},${donor.phoneNumber});`);
-    var lastInsertedID = result.lastInsertId;
-    if lastInsertedID is int {
-        donor.donorID = lastInsertedID;
-    }
-    return donor;
-}
-
-function getDonors() returns Donor[]|error {
-    Donor[] donors = [];
-    stream<Donor, error?> resultStream = dbClient->query(`SELECT DONORID, ORGNAME, ORGLINK, EMAIL, PHONENUMBER FROM DONOR`);
-    check from Donor donor in resultStream
-        do {
-            donors.push(donor);
-        };
-    check resultStream.close();
-    return donors;
-}
-
 //Pledge
 function getPledges(int? packageId = ()) returns Pledge[]|error {
     Pledge[] pledges = [];
@@ -147,7 +120,6 @@ function getPledges(int? packageId = ()) returns Pledge[]|error {
     stream<Pledge, error?> resultStream = dbClient->query(query);
     check from Pledge pledge in resultStream
         do {
-            pledge.donor = check getDonor(pledge.donorID);
             pledges.push(pledge);
         };
     check resultStream.close();
@@ -157,7 +129,6 @@ function getPledges(int? packageId = ()) returns Pledge[]|error {
 function getPledge(int pledgeId) returns Pledge|error {
     Pledge pledge = check dbClient->queryRow(`SELECT PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
                                                                      FROM PLEDGE WHERE PLEDGEID=${pledgeId};`);
-    pledge.donor = check getDonor(pledge.donorID);
     return pledge;
 }
 

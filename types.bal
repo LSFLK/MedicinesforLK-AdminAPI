@@ -17,11 +17,11 @@ type Beneficiary record {
 };
 
 type Donor record {
-    int? donorID = ();
-    string orgName;
-    string orgLink;
-    string email;
-    string phoneNumber;
+    string id;
+    string userName;
+    string firstName;
+    string lastName;
+    string email?;
 };
 
 // Main Types
