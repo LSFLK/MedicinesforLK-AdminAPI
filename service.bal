@@ -138,6 +138,7 @@ service /admin on new http:Listener(9090) {
         foreach AidPackageItem aidPackageItem in aidPackageItems {
             check deleteAidPackageItem(packageID, <int> aidPackageItem.packageItemID);
         }
+        check deleteAidPackage(packageID);
         return packageID;
     }
 
