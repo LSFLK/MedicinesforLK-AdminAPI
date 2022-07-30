@@ -300,8 +300,17 @@ function constructAidPAckageItem(int packageId, AidPackageItem aidPackageItem) r
 }
 
 function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
+    int itemQuantity = check dbClient->queryRow(`SELECT QUANTITY FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId} 
+                                        AND PACKAGEITEMID=${packageItemId};`);
+    int needId = check dbClient->queryRow(`SELECT NEEDID FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId}
+                                        AND PACKAGEITEMID=${packageItemId};`);
+    _ = check dbClient->execute(`UPDATE MEDICAL_NEED SET NEEDEDQUANTITY = NEEDEDQUANTITY + ${itemQuantity} WHERE NEEDID=${needId};`);
     _ = check dbClient->execute(`DELETE FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId}
                                         AND PACKAGEITEMID=${packageItemId};`);
+}
+
+function deleteAidPackage(int packageId) returns error? {
+    _ = check dbClient->execute(`DELETE FROM AID_PACKAGE WHERE PACKAGEID=${packageId};`);
 }
 
 function insertOrUpdateAidPackageItem(AidPackageItem aidPackageItem) returns error? {
