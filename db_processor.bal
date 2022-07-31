@@ -112,23 +112,6 @@ function getMatchingQuotatonsForMedicalNeed(MedicalNeed medicalNeed) returns Quo
     return quotations;
 }
 
-//Donor
-function getDonor(string donorId) returns Donor|error {
-    return check dbClient->queryRow(`SELECT DONORID, ORGNAME, ORGLINK, EMAIL, PHONENUMBER FROM DONOR 
-                                        WHERE DONORID=${donorId}`);
-}
-
-function getDonors() returns Donor[]|error {
-    Donor[] donors = [];
-    stream<Donor, error?> resultStream = dbClient->query(`SELECT DONORID, ORGNAME, ORGLINK, EMAIL, PHONENUMBER FROM DONOR`);
-    check from Donor donor in resultStream
-        do {
-            donors.push(donor);
-        };
-    check resultStream.close();
-    return donors;
-}
-
 //Pledge
 function getPledges(int? packageId = ()) returns Pledge[]|error {
     Pledge[] pledges = [];

@@ -37,12 +37,13 @@ service /admin on new http:Listener(9090) {
         return addSupplier(supplier);
     }
 
-    resource function get donors/[string donorId]() returns Donor|error {
-        return getDonor(donorId);
-    }
-
-    resource function get donors() returns Donor[]|error {
-        return getDonors();
+    # A resource to retrieve all donors.
+    #
+    # + pageNumber - Current page number
+    # + pageCount - Maximum number of results expected per page
+    # + return - List of donors
+    resource function get donors(int pageNumber = 0, int pageCount = defaultPageCount) returns Donor[]|error {
+        return getDonors(pageNumber, pageCount);
     }
 
     # A resource for creating  quotation
