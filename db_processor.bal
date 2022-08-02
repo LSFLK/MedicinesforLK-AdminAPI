@@ -116,7 +116,7 @@ function getMatchingQuotatonsForMedicalNeed(MedicalNeed medicalNeed) returns Quo
 function getPledges(int? packageId = ()) returns Pledge[]|error {
     Pledge[] pledges = [];
     sql:ParameterizedQuery query = `SELECT PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS FROM PLEDGE`;
-    if (packageId is int) {
+    if packageId is int {
         query = sql:queryConcat(query, ` WHERE PACKAGEID=${packageId}`);
     }
     stream<Pledge, error?> resultStream = dbClient->query(query);
