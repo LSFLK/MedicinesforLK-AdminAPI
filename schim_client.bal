@@ -75,27 +75,39 @@ final http:Client schimClientEp = check new(schimEndpoint,
 );
 
 isolated function getDonors(int pageNumber, int pageCount) returns Donor[]|error {
-    int startIdx = pageNumber == 0 ? 1: pageCount + (pageNumber - 1 * pageCount);
-    SchimUserSearchRequest requestPayload = {
-        filter: "groups eq donor",
-        domain: userDomain,
-        startIndex: startIdx,
-        count: pageCount
-    };
-    SchimUserResponse schimResponse = check schimClientEp->post("/Users/.search", requestPayload);
-    User[]? availableUsers = schimResponse?.Resources;
-    if availableUsers is User[] {
-        return
-        from var {id, userName, name, emails} in availableUsers
-        select {
-            id: id, 
-            userName: userName, 
-            firstName: name.givenName, 
-            lastName: name.familyName, 
-            email: check getPrimaryEmail(emails)
-        };
-    }
+    // int startIdx = pageNumber == 0 ? 1: pageCount + (pageNumber - 1 * pageCount);
+    // SchimUserSearchRequest requestPayload = {
+    //     filter: "groups eq donor",
+    //     domain: userDomain,
+    //     startIndex: startIdx,
+    //     count: pageCount
+    // };
+    // SchimUserResponse schimResponse = check schimClientEp->post("/Users/.search", requestPayload);
+    // User[]? availableUsers = schimResponse?.Resources;
+    // if availableUsers is User[] {
+    //     return
+    //     from var {id, userName, name, emails} in availableUsers
+    //     select {
+    //         id: id, 
+    //         userName: userName, 
+    //         firstName: name.givenName, 
+    //         lastName: name.familyName, 
+    //         email: check getPrimaryEmail(emails)
+    //     };
+    // }
     return [];
+}
+
+type DonorScimResponse record {
+    Donor[] Resources;
+};
+
+isolated function getDonor(string donorId) returns Donor?|error {
+    DonorScimResponse|error scimResult = check schimClientEp->get("/Users?filter=id eq " + donorId + "&attributes=displayName");
+    if scimResult is error {
+        return;
+    }
+    return scimResult.Resources[0];
 }
 
 isolated function getPrimaryEmail((Email|string)[] emails) returns string|error {

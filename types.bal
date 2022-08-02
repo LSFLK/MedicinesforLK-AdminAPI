@@ -17,11 +17,7 @@ type Beneficiary record {
 };
 
 type Donor record {
-    string id;
-    string userName;
-    string firstName;
-    string lastName;
-    string email?;
+    string displayName;
 };
 
 // Main Types
@@ -94,6 +90,7 @@ type Pledge record {
     string donorID;
     decimal amount;
     string status;
+    Donor? donor;
 };
 
 type PledgeUpdate record {
