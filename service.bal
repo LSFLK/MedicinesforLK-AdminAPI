@@ -184,7 +184,7 @@ service /admin on new http:Listener(9090) {
     # + return - List of donors
     resource function get aidpackages/[int packageId]/donors() returns Donor[]|error {
         Pledge[] availablePledges = check getPledges(packageId);
-        return availablePledges.'map(p => p.donor);
+        return availablePledges.filter(p => p?.donor is Donor).'map(p => <Donor>p?.donor);
     }
 
     # A resource for fetching details of all pledges

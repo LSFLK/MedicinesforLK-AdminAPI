@@ -122,7 +122,10 @@ function getPledges(int? packageId = ()) returns Pledge[]|error {
     stream<Pledge, error?> resultStream = dbClient->query(query);
     check from Pledge pledge in resultStream
         do {
-            pledge.donor = check getDonor(pledge.donorID);
+            Donor? donor = check getDonor(pledge.donorID);
+            if donor is Donor {
+                pledge.donor = donor;
+            }
             pledges.push(pledge);
         };
     check resultStream.close();
@@ -132,7 +135,10 @@ function getPledges(int? packageId = ()) returns Pledge[]|error {
 function getPledge(int pledgeId) returns Pledge|error {
     Pledge pledge = check dbClient->queryRow(`SELECT PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
                                                                      FROM PLEDGE WHERE PLEDGEID=${pledgeId};`);
-    pledge.donor = check getDonor(pledge.donorID);
+    Donor? donor = check getDonor(pledge.donorID);
+    if donor is Donor {
+        pledge.donor = donor;
+    }
     return pledge;
 }
 
