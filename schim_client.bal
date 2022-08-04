@@ -99,15 +99,16 @@ isolated function getDonors(int pageNumber, int pageCount) returns Donor[]|error
 }
 
 type DonorScimResponse record {
-    Donor[] Resources;
+    Donor[] Resources?;
 };
 
-isolated function getDonor(string donorId) returns Donor?|error {
-    DonorScimResponse|error scimResult = check schimClientEp->get("/Users?filter=id eq " + donorId + "&attributes=displayName");
+isolated function getDonor(string donorId) returns Donor? {
+    DonorScimResponse|error scimResult = schimClientEp->get("/Users?filter=id eq " + donorId + "&attributes=displayName");
     if scimResult is error {
         return;
     }
-    return scimResult.Resources[0];
+    Donor[]? donors = scimResult.Resources; // donors.length must be 1 when it's an array
+    return donors != () ? donors[0] : ();
 }
 
 isolated function getPrimaryEmail((Email|string)[] emails) returns string|error {
