@@ -116,13 +116,16 @@ function getMatchingQuotatonsForMedicalNeed(MedicalNeed medicalNeed) returns Quo
 function getPledges(int? packageId = ()) returns Pledge[]|error {
     Pledge[] pledges = [];
     sql:ParameterizedQuery query = `SELECT PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS FROM PLEDGE`;
-    if (packageId is int) {
+    if packageId is int {
         query = sql:queryConcat(query, ` WHERE PACKAGEID=${packageId}`);
     }
     stream<Pledge, error?> resultStream = dbClient->query(query);
     check from Pledge pledge in resultStream
         do {
-            pledge.donor = getDonor(pledge.donorID);
+            Donor? donor = check getDonor(pledge.donorID);
+            if donor is Donor {
+                pledge.donor = donor;
+            }
             pledges.push(pledge);
         };
     check resultStream.close();
@@ -132,7 +135,10 @@ function getPledges(int? packageId = ()) returns Pledge[]|error {
 function getPledge(int pledgeId) returns Pledge|error {
     Pledge pledge = check dbClient->queryRow(`SELECT PLEDGEID, PACKAGEID, DONORID, AMOUNT, STATUS 
                                                                      FROM PLEDGE WHERE PLEDGEID=${pledgeId};`);
-    pledge.donor = getDonor(pledge.donorID);
+    Donor? donor = check getDonor(pledge.donorID);
+    if donor is Donor {
+        pledge.donor = donor;
+    }
     return pledge;
 }
 

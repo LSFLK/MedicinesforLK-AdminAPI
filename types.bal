@@ -90,7 +90,7 @@ type Pledge record {
     string donorID;
     decimal amount;
     string status;
-    Donor? donor;
+    Donor donor?;
 };
 
 type PledgeUpdate record {
