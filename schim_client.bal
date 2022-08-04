@@ -10,7 +10,7 @@ final http:Client schimClientEp = check new(schimEndpoint,
 );
 
 # Record to represent SCHIM Donor search response.
-# 
+#
 # + Resources - Results for the search query
 type DonorScimResponse record {
     Donor[] Resources?;

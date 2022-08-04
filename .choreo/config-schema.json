@@ -27,6 +27,37 @@
             "db": {
               "type": "string",
               "description": ""
+            },
+            "schimEndpoint": {
+              "type": "string",
+              "description": ""
+            },
+            "tokenEndpoint": {
+              "type": "string",
+              "description": ""
+            },
+            "clientId": {
+              "type": "string",
+              "description": ""
+            },
+            "clientSecret": {
+              "type": "string",
+              "description": ""
+            },
+            "schimScopes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": ""
+            },
+            "userDomain": {
+              "type": "string",
+              "description": ""
+            },
+            "defaultPageCount": {
+              "type": "integer",
+              "description": ""
             }
           },
           "additionalProperties": false
