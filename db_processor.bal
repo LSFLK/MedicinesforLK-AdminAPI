@@ -269,6 +269,16 @@ function getAidPackageItems(int packageId) returns AidPackageItem[]|error {
     return aidPackageItems;
 }
 
+//Aid Package Item
+function getAidPackageItem(int packageItemId) returns AidPackageItem|error {
+
+    AidPackageItem aidPackageItem = check dbClient->queryRow(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
+                                                                               NEEDID, INITIALQUANTITY, QUANTITY, TOTALAMOUNT 
+                                                                               FROM AID_PACKAGE_ITEM
+                                                                               WHERE PACKAGEITEMID=${packageItemId};`);
+    return aidPackageItem;
+}
+
 function addAidPackageItem(AidPackageItem aidPackageItem) returns int|error {
     int aidPackageItemId = -1;
     sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, NEEDID, INITIALQUANTITY, QUANTITY,TOTALAMOUNT)
@@ -322,7 +332,7 @@ function insertOrUpdateAidPackageItem(AidPackageItem aidPackageItem) returns err
                                         ) ON DUPLICATE KEY UPDATE
                                         QUANTITY=${aidPackageItem.quantity},
                                         TOTALAMOUNT=${aidPackageItem.totalAmount};`;
-    
+
     if (aidPackage.status == "Draft") {
         query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, 
                                         NEEDID, INITIALQUANTITY, QUANTITY, TOTALAMOUNT)
@@ -332,7 +342,7 @@ function insertOrUpdateAidPackageItem(AidPackageItem aidPackageItem) returns err
                                         INITIALQUANTITY=${aidPackageItem.quantity},
                                         QUANTITY=${aidPackageItem.quantity},
                                         TOTALAMOUNT=${aidPackageItem.totalAmount};`;
-    
+
     }
     sql:ExecutionResult result = check dbClient->execute(query);
     var lastInsertedID = result.lastInsertId;
@@ -409,6 +419,22 @@ function checkMedicalNeedQuantityAvailable(AidPackageItem aidPackageItem) return
 
 }
 
+//Check Already Pledged againest the Aid Package Item Update
+function checkAlreadyPledgedAgainstAidPackageUpdate(AidPackageItem aidPackageItem, boolean deleteItem) returns boolean|error {
+    decimal totalAmount = check dbClient->queryRow(`SELECT sum(TOTALAMOUNT) FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${aidPackageItem.packageID} AND PACKAGEITEMID!=${aidPackageItem.packageItemID};`);
+    Quotation quotation = check getQuotation(aidPackageItem.quotationID);
+    if(!deleteItem){
+        totalAmount += aidPackageItem.quantity * quotation.unitPrice;
+    }
+    decimal pledgedAmount = check dbClient->queryRow(`SELECT sum(AMOUNT) FROM PLEDGE WHERE PACKAGEID=${aidPackageItem.packageID};`);
+    if (pledgedAmount <= totalAmount) {
+        return true;
+    } else {
+        return false;
+    }
+
+}
+
 //Update Medical Need Quantity
 function updateMedicalNeedQuantity(int needId) returns error? {
     _ = check dbClient->execute(`UPDATE MEDICAL_NEED SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM 
@@ -447,14 +473,14 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
 
     sql:ParameterizedQuery[] insertQueries =
         from var data in newMedicalNeed
-        select `INSERT INTO MEDICAL_NEED 
+    select `INSERT INTO MEDICAL_NEED 
                     (ITEMID, BENEFICIARYID, PERIOD, NEEDEDQUANTITY, REMAININGQUANTITY, URGENCY) 
                     VALUES (${data.itemID}, ${data.beneficiaryID},
                     ${data.period}, ${data.neededQuantity}, ${data.neededQuantity}, ${data.urgency})`;
 
     sql:ParameterizedQuery[] updateQueries =
         from var data in needsRequireUpdate
-        select `UPDATE MEDICAL_NEED 
+    select `UPDATE MEDICAL_NEED 
                     SET NEEDEDQUANTITY = ${data.neededQuantity},
                     REMAININGQUANTITY = ${data.neededQuantity} ,
                     URGENCY = ${data.urgency} 
@@ -556,10 +582,10 @@ function generateTransactionErrorMessage(sql:ExecutionResult[]|error insertResul
     return message;
 }
 
-function checkPeriodNeedandQuotation(int needid,int quotationID) returns boolean|error {
-    MedicalNeed medicalNeed=check getMedicalNeed(needid);
-    Quotation quotation=check getQuotation(quotationID);
-    if(medicalNeed.period== quotation.period){
+function checkPeriodNeedandQuotation(int needid, int quotationID) returns boolean|error {
+    MedicalNeed medicalNeed = check getMedicalNeed(needid);
+    Quotation quotation = check getQuotation(quotationID);
+    if (medicalNeed.period == quotation.period) {
         return true;
     }
     return false;
@@ -568,3 +594,4 @@ function checkPeriodNeedandQuotation(int needid,int quotationID) returns boolean
 function getEpoch() returns int {
     return time:utcNow()[0];
 }
+

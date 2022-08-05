@@ -119,11 +119,14 @@ service /admin on new http:Listener(9090) {
         if (check checkPeriodNeedandQuotation(aidPackageItem.needID, aidPackageItem.quotationID)) {
             aidPackageItem.packageID = packageID;
             if (check checkMedicalNeedQuantityAvailable(aidPackageItem)) {
-                check insertOrUpdateAidPackageItem(aidPackageItem);
-                check updateMedicalNeedQuantity(aidPackageItem.needID);
-                check updateQuotationRemainingQuantity(aidPackageItem);
-                aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
-                return aidPackageItem;
+                if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem,false)) {
+                    check insertOrUpdateAidPackageItem(aidPackageItem);
+                    check updateMedicalNeedQuantity(aidPackageItem.needID);
+                    aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
+                    return aidPackageItem;
+                } else {
+                    return error 'error("Already done Pledges amount exceeds the Aid Package Item Quantitiy Update");
+                }
             } else {
                 return error 'error("Medical Need Remaining Amount Exceeds Aid Package Item Amount");
             }
@@ -147,7 +150,12 @@ service /admin on new http:Listener(9090) {
     # A resource for removing an AidPackage-Item
     # + return - aidPackageItem
     resource function delete aidpackages/[int packageID]/aidpackageitems/[int packageItemID]() returns int|error {
-        check deleteAidPackageItem(packageID, packageItemID);
+        AidPackageItem aidPackageItem = check getAidPackageItem(packageItemID);
+        if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem,true)) {
+            check deleteAidPackageItem(packageID, packageItemID);
+        } else {
+            return error 'error("Already done Pledges amount exceeds the Aid Package Item Quantitiy Update");
+        }
         return packageItemID;
     }
 
