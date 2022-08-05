@@ -47,6 +47,7 @@ type Quotation record {
     int itemID;
     string brandName;
     int availableQuantity;
+    int remainingQuantity;
     time:Date period;
     time:Date expiryDate;
     string regulatoryInfo;
