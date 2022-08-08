@@ -585,7 +585,7 @@ function generateTransactionErrorMessage(sql:ExecutionResult[]|error insertResul
 function checkPeriodNeedandQuotation(int needid, int quotationID) returns boolean|error {
     MedicalNeed medicalNeed = check getMedicalNeed(needid);
     Quotation quotation = check getQuotation(quotationID);
-    if (medicalNeed.period == quotation.period) {
+    if medicalNeed.period == quotation.period {
         return true;
     }
     return false;
