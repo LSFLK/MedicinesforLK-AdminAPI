@@ -441,7 +441,7 @@ function updateMedicalNeedQuantity(int needId) returns error? {
 function updateQuotationRemainingQuantity(AidPackageItem aidPackageItem) returns error? {
     Quotation aidPackageItemQuotation = check getQuotation(aidPackageItem.quotationID);
     _= check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=REMAININGQUANTITY-(${aidPackageItem.quantity}-${aidPackageItem.initialQuantity}) 
-                    WHERE QUOTATIONID=${aidPackageItemQuotation.quotationId};`);
+                    WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID};`);
 }
 
 function getReceivedAmount(int packageId) returns decimal|error {
