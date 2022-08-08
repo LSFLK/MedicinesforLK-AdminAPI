@@ -175,7 +175,7 @@ function deletePledgeUpdate(int pledgeId, int pledgeUpdateId) returns error? {
 }
 
 function insertOrUpdatePledgeUpdate(PledgeUpdate pledgeUpdate) returns error? {
-    int currentTime = check getCurrentTimeZoneTime();
+    int currentTime = getEpoch();
     sql:ParameterizedQuery query = `INSERT INTO PLEDGE_UPDATE(PLEDGEID, PLEDGEUPDATEID, UPDATECOMMENT, DATETIME)
                                         VALUES (${pledgeUpdate.pledgeID},
                                                 IFNULL(${pledgeUpdate.pledgeUpdateID}, DEFAULT(PLEDGEUPDATEID)),
@@ -204,6 +204,7 @@ function getAidPackages(string? status) returns AidPackage[]|error {
     if (status is string) {
         query = sql:queryConcat(query, ` WHERE STATUS=${status}`);
     }
+    query = sql:queryConcat(query, ` ORDER BY PACKAGEID DESC`);
     stream<AidPackage, error?> resultStream = dbClient->query(query);
     check from AidPackage aidPackage in resultStream
         do {
@@ -350,7 +351,7 @@ function getAidPackageUpdate(int packageId) returns AidPackageUpdate[]|error {
 }
 
 function insertOrUpdateAidPackageUpdate(AidPackageUpdate aidPackageUpdate) returns error? {
-    int currentTime = check getCurrentTimeZoneTime();
+    int currentTime = getEpoch();
     sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_UPDATE(PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME)
                                         VALUES (${aidPackageUpdate.packageID},
                                                 IFNULL(${aidPackageUpdate.packageUpdateID}, DEFAULT(PACKAGEUPDATEID)),
@@ -553,15 +554,6 @@ function checkPeriodNeedandQuotation(int needid,int quotationID) returns boolean
     return false;
 }
 
-function getCurrentTimeZoneTime() returns int|error {
-    time:Utc currentTimeUtc = time:utcNow();
-    time:Zone? zone = time:getZone(TIME_ZONE);
-    if zone == () {
-        return error("Invalid time zone");
-    }
-    time:Utc|error timeZoneTime = zone.utcFromCivil(time:utcToCivil(currentTimeUtc));
-    if timeZoneTime is error {
-        return error("Failed to convert utc to time zone", timeZoneTime);
-    }
-    return timeZoneTime[0];
+function getEpoch() returns int {
+    return time:utcNow()[0];
 }
