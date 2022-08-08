@@ -76,16 +76,16 @@ function addSupplier(Supplier supplier) returns Supplier|error {
 
 //Quotation
 function getQuotation(int quotationId) returns Quotation|error {
-    return check dbClient->queryRow(`SELECT QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD, EXPIRYDATE,
+    return check dbClient->queryRow(`SELECT QUOTATIONID, SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, REMAININGQUANTITY, PERIOD, EXPIRYDATE,
                                         UNITPRICE, REGULATORYINFO FROM QUOTATION  WHERE QUOTATIONID=${quotationId}`);
 }
 
 function addQuotation(Quotation quotation) returns int|error {
     int quotationId = -1;
     sql:ExecutionResult result = check dbClient->execute(`INSERT INTO QUOTATION(SUPPLIERID, ITEMID, BRANDNAME, 
-                                        AVAILABLEQUANTITY, PERIOD, EXPIRYDATE, UNITPRICE, REGULATORYINFO)
+                                        AVAILABLEQUANTITY, REMAININGQUANTITY, PERIOD, EXPIRYDATE, UNITPRICE, REGULATORYINFO)
                                         VALUES (${quotation.supplierID}, ${quotation.itemID}, ${quotation.brandName},
-                                        ${quotation.availableQuantity}, ${quotation.period},
+                                        ${quotation.availableQuantity}, ${quotation.remainingQuantity}, ${quotation.period},
                                         ${quotation.expiryDate}, ${quotation.unitPrice}, ${quotation.regulatoryInfo});`);
     var lastInsertedID = result.lastInsertId;
     if lastInsertedID is int {
@@ -97,7 +97,7 @@ function addQuotation(Quotation quotation) returns int|error {
 function getMatchingQuotatonsForMedicalNeed(MedicalNeed medicalNeed) returns Quotation[]|error {
     Quotation[] quotations = [];
     stream<Quotation, error?> resultQuotationStream = dbClient->query(`SELECT QUOTATIONID, SUPPLIERID,
-                                                                                BRANDNAME, AVAILABLEQUANTITY, PERIOD,
+                                                                                BRANDNAME, AVAILABLEQUANTITY, REMAININGQUANTITY, PERIOD,
                                                                                 EXPIRYDATE, UNITPRICE, REGULATORYINFO
                                                                                 FROM QUOTATION Q
                                                                                 WHERE YEAR(Q.PERIOD)=${medicalNeed.period.year} 
@@ -289,9 +289,12 @@ function constructAidPAckageItem(int packageId, AidPackageItem aidPackageItem) r
     aidPackageItem.totalAmount = <decimal>aidPackageItem.quantity * quotation.unitPrice;
     aidPackageItem.packageItemID = check addAidPackageItem(aidPackageItem);
     check updateMedicalNeedQuantity(aidPackageItem.needID);
+    check updateQuotationRemainingQuantity(aidPackageItem);
 }
 
 function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
+    int itemQuotationId = check dbClient->queryRow(`SELECT QUOTATIONID FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId}
+                                        AND PACKAGEITEMID=${packageItemId};`);
     int itemQuantity = check dbClient->queryRow(`SELECT QUANTITY FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId} 
                                         AND PACKAGEITEMID=${packageItemId};`);
     int needId = check dbClient->queryRow(`SELECT NEEDID FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId}
@@ -300,6 +303,7 @@ function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
     _ = check dbClient->execute(`DELETE AID_PACKAGE_ITEM FROM AID_PACKAGE_ITEM INNER JOIN AID_PACKAGE ON
     AID_PACKAGE_ITEM.PACKAGEID=AID_PACKAGE.PACKAGEID WHERE
     AID_PACKAGE_ITEM.PACKAGEID=${packageId} AND PACKAGEITEMID=${packageItemId} AND (STATUS="Draft" OR STATUS="Published");`);
+    _ = check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=REMAININGQUANTITY+${itemQuantity} WHERE QUOTATIONID=${itemQuotationId};`); 
 }
 
 function deleteAidPackage(int packageId) returns error? {
@@ -411,6 +415,13 @@ function updateMedicalNeedQuantity(int needId) returns error? {
                      AID_PACKAGE_ITEM WHERE NEEDID=${needId}) WHERE NEEDID=${needId};`);
 }
 
+//Update Remaining Quantity in Quotation
+function updateQuotationRemainingQuantity(AidPackageItem aidPackageItem) returns error? {
+    Quotation aidPackageItemQuotation = check getQuotation(aidPackageItem.quotationID);
+    _= check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=REMAININGQUANTITY-(${aidPackageItem.quantity}-${aidPackageItem.initialQuantity}) 
+                    WHERE QUOTATIONID=${aidPackageItemQuotation.quotationId};`);
+}
+
 function getReceivedAmount(int packageId) returns decimal|error {
     decimal recievedAmount = check dbClient->queryRow(`SELECT IFNULL(SUM(AMOUNT),0) FROM PLEDGE 
                                                         WHERE PACKAGEID = ${packageId};`);
@@ -473,8 +484,8 @@ function updateQuotationsTable(Quotation[] quotations) returns string|error {
     sql:ParameterizedQuery[] insertQueries =
         from var data in newquotations
     select `INSERT INTO QUOTATION 
-                (SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, PERIOD, EXPIRYDATE, UNITPRICE, REGULATORYINFO) 
-                VALUES (${data.supplierID}, ${data.itemID},${data.brandName}, ${data.availableQuantity}, ${data.period}, 
+                (SUPPLIERID, ITEMID, BRANDNAME, AVAILABLEQUANTITY, REMAININGQUANTITY, PERIOD, EXPIRYDATE, UNITPRICE, REGULATORYINFO) 
+                VALUES (${data.supplierID}, ${data.itemID},${data.brandName}, ${data.availableQuantity}, ${data.remainingQuantity}, ${data.period}, 
                 ${data.expiryDate}, ${data.unitPrice}, ${data.regulatoryInfo})`;
 
     sql:ParameterizedQuery[] updateQueries =

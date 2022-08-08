@@ -63,13 +63,14 @@ function readMedicalNeedsCSVLine(string[] line, int csvLineNo) returns [string, 
     check readIntCSVField(line[7], csvLineNo)
 ];
 
-function readSupplyQuotationsCSVLine(string[] line, int csvLineNo) returns [string, string, string, string, string, string, int, string, decimal]|error => [
+function readSupplyQuotationsCSVLine(string[] line, int csvLineNo) returns [string, string, string, string, string, string, int, int, string, decimal]|error => [
     line[0],
     line[1],
     line[2],
     line[3],
     line[4],
     line[5],
+    check readIntCSVField(line[6], csvLineNo),
     check readIntCSVField(line[6], csvLineNo),
     line[7],
     check readDollerCSVField(line[8], csvLineNo)
@@ -213,7 +214,7 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
         int quotationSupplierId = -1;
         csvLineNo += 1;
         if (line.length() == 9) {
-            var [_, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, expiryDate, unitPrice]
+            var [_, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, remainingQuantity, expiryDate, unitPrice]
                 = check readSupplyQuotationsCSVLine(line, csvLineNo);
             int|error itemID = getMedicalItemId(itemNeeded);
             if (itemID is error) {
@@ -237,6 +238,7 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
                     itemID: medicalItemId,
                     brandName,
                     availableQuantity,
+                    remainingQuantity,
                     period: check getPeriod(period),
                     expiryDate: check getDateFromString(expiryDate),
                     regulatoryInfo,
