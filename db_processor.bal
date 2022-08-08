@@ -427,11 +427,7 @@ function checkAlreadyPledgedAgainstAidPackageUpdate(AidPackageItem aidPackageIte
         totalAmount += aidPackageItem.quantity * quotation.unitPrice;
     }
     decimal pledgedAmount = check dbClient->queryRow(`SELECT sum(AMOUNT) FROM PLEDGE WHERE PACKAGEID=${aidPackageItem.packageID};`);
-    if (pledgedAmount <= totalAmount) {
-        return true;
-    } else {
-        return false;
-    }
+    return pledgedAmount <= totalAmount;
 
 }
 
