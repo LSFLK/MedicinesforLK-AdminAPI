@@ -473,7 +473,7 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
 
     sql:ParameterizedQuery[] insertQueries =
         from var data in newMedicalNeed
-    select `INSERT INTO MEDICAL_NEED 
+        select `INSERT INTO MEDICAL_NEED 
                     (ITEMID, BENEFICIARYID, PERIOD, NEEDEDQUANTITY, REMAININGQUANTITY, URGENCY) 
                     VALUES (${data.itemID}, ${data.beneficiaryID},
                     ${data.period}, ${data.neededQuantity}, ${data.neededQuantity}, ${data.urgency})`;
