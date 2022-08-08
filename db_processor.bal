@@ -480,7 +480,7 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
 
     sql:ParameterizedQuery[] updateQueries =
         from var data in needsRequireUpdate
-    select `UPDATE MEDICAL_NEED 
+        select `UPDATE MEDICAL_NEED 
                     SET NEEDEDQUANTITY = ${data.neededQuantity},
                     REMAININGQUANTITY = ${data.neededQuantity} ,
                     URGENCY = ${data.urgency} 
