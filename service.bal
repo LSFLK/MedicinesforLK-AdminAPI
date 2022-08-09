@@ -151,7 +151,7 @@ service /admin on new http:Listener(9090) {
     # + return - aidPackageItem
     resource function delete aidpackages/[int packageID]/aidpackageitems/[int packageItemID]() returns int|error {
         AidPackageItem aidPackageItem = check getAidPackageItem(packageItemID);
-        if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem,true)) {
+        if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem, true)) {
             check deleteAidPackageItem(packageID, packageItemID);
         } else {
             return error("Already done Pledges amount exceeds the Aid Package Item Quantitiy Update");
