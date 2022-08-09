@@ -154,7 +154,7 @@ service /admin on new http:Listener(9090) {
         if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem,true)) {
             check deleteAidPackageItem(packageID, packageItemID);
         } else {
-            return error 'error("Already done Pledges amount exceeds the Aid Package Item Quantitiy Update");
+            return error("Already done Pledges amount exceeds the Aid Package Item Quantitiy Update");
         }
         return packageItemID;
     }
