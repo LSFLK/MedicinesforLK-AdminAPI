@@ -272,11 +272,10 @@ function getAidPackageItems(int packageId) returns AidPackageItem[]|error {
 //Aid Package Item
 function getAidPackageItem(int packageItemId) returns AidPackageItem|error {
 
-    AidPackageItem aidPackageItem = check dbClient->queryRow(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
-                                                                               NEEDID, INITIALQUANTITY, QUANTITY, TOTALAMOUNT 
-                                                                               FROM AID_PACKAGE_ITEM
-                                                                               WHERE PACKAGEITEMID=${packageItemId};`);
-    return aidPackageItem;
+    return dbClient->queryRow(`SELECT PACKAGEITEMID, PACKAGEID, QUOTATIONID,
+                                NEEDID, INITIALQUANTITY, QUANTITY, TOTALAMOUNT 
+                                FROM AID_PACKAGE_ITEM
+                                WHERE PACKAGEITEMID=${packageItemId};`);
 }
 
 function addAidPackageItem(AidPackageItem aidPackageItem) returns int|error {
