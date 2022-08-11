@@ -309,9 +309,16 @@ function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
     int needId = check dbClient->queryRow(`SELECT NEEDID FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId}
                                         AND PACKAGEITEMID=${packageItemId};`);
     _ = check dbClient->execute(`UPDATE MEDICAL_NEED SET NEEDEDQUANTITY = NEEDEDQUANTITY + ${itemQuantity} WHERE NEEDID=${needId};`);
-    _ = check dbClient->execute(`DELETE AID_PACKAGE_ITEM FROM AID_PACKAGE_ITEM INNER JOIN AID_PACKAGE ON
+    sql:ExecutionResult result = check dbClient->execute(`DELETE AID_PACKAGE_ITEM FROM AID_PACKAGE_ITEM INNER JOIN AID_PACKAGE ON
     AID_PACKAGE_ITEM.PACKAGEID=AID_PACKAGE.PACKAGEID WHERE
     AID_PACKAGE_ITEM.PACKAGEID=${packageId} AND PACKAGEITEMID=${packageItemId} AND (STATUS="Draft" OR STATUS="Published");`);
+    if result.affectedRowCount != 1 {
+        AidPackage aidPackage = check getAidPackage(packageId);
+        if aidPackage.status != "Draft" && aidPackage.status != "Published" {
+            return error("Can't delete items from package in " + (aidPackage.status ?: "()") + " status");
+        }
+        return error("Couldn't delete package");
+    }
     _ = check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=REMAININGQUANTITY+${itemQuantity} WHERE QUOTATIONID=${itemQuotationId};`); 
 }
 
@@ -324,6 +331,9 @@ function insertOrUpdateAidPackageItem(AidPackageItem aidPackageItem) returns err
     Quotation quotation = check getQuotation(aidPackageItem.quotationID);
     aidPackageItem.quotation = quotation;
     aidPackageItem.totalAmount = <decimal>aidPackageItem.quantity * quotation.unitPrice;
+    if aidPackage.status != "Draft" && aidPackage.status != "Published" {
+        return error("Can't edit items in package in " + (aidPackage.status ?: "()") + " status");
+    }
     sql:ParameterizedQuery query = `INSERT INTO AID_PACKAGE_ITEM(QUOTATIONID, PACKAGEID, 
                                         NEEDID, INITIALQUANTITY, QUANTITY, TOTALAMOUNT)
                                         VALUES (${aidPackageItem.quotationID}, ${aidPackageItem.packageID},${aidPackageItem.needID},
