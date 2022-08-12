@@ -302,11 +302,6 @@ function constructAidPAckageItem(int packageId, AidPackageItem aidPackageItem) r
 }
 
 function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
-    int itemQuantity = check dbClient->queryRow(`SELECT QUANTITY FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId} 
-                                        AND PACKAGEITEMID=${packageItemId};`);
-    int needId = check dbClient->queryRow(`SELECT NEEDID FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId}
-                                        AND PACKAGEITEMID=${packageItemId};`);
-    _ = check dbClient->execute(`UPDATE MEDICAL_NEED SET NEEDEDQUANTITY = NEEDEDQUANTITY + ${itemQuantity} WHERE NEEDID=${needId};`);
     sql:ExecutionResult result = check dbClient->execute(`DELETE AID_PACKAGE_ITEM FROM AID_PACKAGE_ITEM INNER JOIN AID_PACKAGE ON
     AID_PACKAGE_ITEM.PACKAGEID=AID_PACKAGE.PACKAGEID WHERE
     AID_PACKAGE_ITEM.PACKAGEID=${packageId} AND PACKAGEITEMID=${packageItemId} AND (STATUS="Draft" OR STATUS="Published");`);

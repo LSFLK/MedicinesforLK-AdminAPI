@@ -143,6 +143,7 @@ service /admin on new http:Listener(9090) {
         AidPackageItem[] aidPackageItems = check getAidPackageItems(packageID);
         foreach AidPackageItem aidPackageItem in aidPackageItems {
             check deleteAidPackageItem(packageID, <int> aidPackageItem.packageItemID);
+            check updateMedicalNeedQuantity(aidPackageItem.needID);
             check updateQuotationRemainingQuantity(aidPackageItem);
         }
         check deleteAidPackage(packageID);
@@ -155,6 +156,7 @@ service /admin on new http:Listener(9090) {
         AidPackageItem aidPackageItem = check getAidPackageItem(packageItemID);
         if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem, true)) {
             check deleteAidPackageItem(packageID, packageItemID);
+            check updateMedicalNeedQuantity(aidPackageItem.needID);
             check updateQuotationRemainingQuantity(aidPackageItem);
         } else {
             return error("Already done Pledges amount exceeds the Aid Package Item Quantitiy Update");
