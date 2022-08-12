@@ -302,8 +302,6 @@ function constructAidPAckageItem(int packageId, AidPackageItem aidPackageItem) r
 }
 
 function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
-    int itemQuotationId = check dbClient->queryRow(`SELECT QUOTATIONID FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId}
-                                        AND PACKAGEITEMID=${packageItemId};`);
     int itemQuantity = check dbClient->queryRow(`SELECT QUANTITY FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId} 
                                         AND PACKAGEITEMID=${packageItemId};`);
     int needId = check dbClient->queryRow(`SELECT NEEDID FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${packageId}
@@ -318,8 +316,7 @@ function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
             return error("Can't delete items from package in " + (aidPackage.status ?: "()") + " status");
         }
         return error("Couldn't delete package");
-    }
-    _ = check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=REMAININGQUANTITY+${itemQuantity} WHERE QUOTATIONID=${itemQuotationId};`); 
+    } 
 }
 
 function deleteAidPackage(int packageId) returns error? {
@@ -449,7 +446,8 @@ function updateMedicalNeedQuantity(int needId) returns error? {
 //Update Remaining Quantity in Quotation
 function updateQuotationRemainingQuantity(AidPackageItem aidPackageItem) returns error? {
     Quotation aidPackageItemQuotation = check getQuotation(aidPackageItem.quotationID);
-    _= check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=REMAININGQUANTITY-(${aidPackageItem.quantity}-${aidPackageItem.initialQuantity}) 
+    _= check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=AVAILABLEQUANTITY-(SELECT SUM(QUANTITY) FROM 
+                    AID_PACKAGE_ITEM WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID}) 
                     WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID};`);
 }
 
