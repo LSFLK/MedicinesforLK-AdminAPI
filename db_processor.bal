@@ -355,7 +355,7 @@ function insertOrUpdateAidPackageItem(AidPackageItem aidPackageItem) returns err
 //Aid Package Update
 function getAidPackageUpdate(int packageId) returns AidPackageUpdate[]|error {
     AidPackageUpdate[] aidPackageUpdates = [];
-    stream<AidPackageUpdate, error?> resultStream = dbClient->query(`SELECT PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, DATETIME 
+    stream<AidPackageUpdate, error?> resultStream = dbClient->query(`SELECT PACKAGEID, PACKAGEUPDATEID, UPDATECOMMENT, UNIX_TIMESTAMP(DATETIME) as 'dateTime'
                                                                     FROM AID_PACKAGE_UPDATE WHERE PACKAGEID=${packageId};`);
     check from AidPackageUpdate aidPackageUpdate in resultStream
         do {
@@ -387,8 +387,8 @@ function deleteAidPackageUpdate(int packageId, int packageUpdateId) returns erro
                                         PACKAGEUPDATEID=${packageUpdateId};`);
 }
 
-function getAidPackageUpdateLUT(int? packageUpdateId) returns string|error {
-    return check dbClient->queryRow(`SELECT DATETIME FROM AID_PACKAGE_UPDATE WHERE PACKAGEUPDATEID=${packageUpdateId};`);
+function getAidPackageUpdateLUT(int? packageUpdateId) returns int|error {
+    return check dbClient->queryRow(`SELECT UNIX_TIMESTAMP(DATETIME) as 'dateTime' FROM AID_PACKAGE_UPDATE WHERE PACKAGEUPDATEID=${packageUpdateId};`);
 }
 
 //Check Medical Need Quantity
