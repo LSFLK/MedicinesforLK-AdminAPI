@@ -63,6 +63,7 @@ type AidPackage record {
     string? status = "Draft";
     decimal goalAmount?;
     decimal receivedAmount?;
+    int dateTime?;
     AidPackageItem[] aidPackageItems = [];
 };
 

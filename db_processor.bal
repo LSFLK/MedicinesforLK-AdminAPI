@@ -192,7 +192,7 @@ function insertOrUpdatePledgeUpdate(PledgeUpdate pledgeUpdate) returns error? {
 }
 
 function getAidPackage(int packageId) returns AidPackage|error {
-    AidPackage aidPackage = check dbClient->queryRow(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS FROM AID_PACKAGE
+    AidPackage aidPackage = check dbClient->queryRow(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS, UNIX_TIMESTAMP(DATETIME) as 'dateTime' FROM AID_PACKAGE
                                                           WHERE PACKAGEID=${packageId};`);
     return aidPackage;
 }
@@ -200,7 +200,7 @@ function getAidPackage(int packageId) returns AidPackage|error {
 //Aid Package
 function getAidPackages(string? status) returns AidPackage[]|error {
     AidPackage[] aidPackages = [];
-    sql:ParameterizedQuery query = `SELECT PACKAGEID, NAME, DESCRIPTION, STATUS FROM AID_PACKAGE`;
+    sql:ParameterizedQuery query = `SELECT PACKAGEID, NAME, DESCRIPTION, STATUS, UNIX_TIMESTAMP(DATETIME) as 'dateTime' FROM AID_PACKAGE`;
     if (status is string) {
         query = sql:queryConcat(query, ` WHERE STATUS=${status}`);
     }
@@ -216,8 +216,9 @@ function getAidPackages(string? status) returns AidPackage[]|error {
 
 function addAidPackage(AidPackage aidPackage) returns int|error {
     int packageId = -1;
-    sql:ExecutionResult result = check dbClient->execute(`INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS)
-                                        VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status});`);
+    int currentTime = getEpoch();
+    sql:ExecutionResult result = check dbClient->execute(`INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS, DATETIME)
+                                        VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status}, FROM_UNIXTIME(${currentTime}));`);
     var lastInsertedID = result.lastInsertId;
     if lastInsertedID is int {
         packageId = lastInsertedID;
@@ -425,7 +426,7 @@ function checkAlreadyPledgedAgainstAidPackageUpdate(AidPackageItem aidPackageIte
     decimal totalAmount = check dbClient->queryRow(`SELECT sum(TOTALAMOUNT) FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${aidPackageItem.packageID} AND PACKAGEITEMID!=${aidPackageItem.packageItemID};`);
     Quotation quotation = check getQuotation(aidPackageItem.quotationID);
     if !deleteItem {
-        totalAmount += aidPackageItem.quantity * quotation.unitPrice;
+        totalAmount += <decimal>aidPackageItem.quantity * quotation.unitPrice;
     }
     decimal pledgedAmount = check dbClient->queryRow(`SELECT sum(AMOUNT) FROM PLEDGE WHERE PACKAGEID=${aidPackageItem.packageID};`);
     return pledgedAmount <= totalAmount;
