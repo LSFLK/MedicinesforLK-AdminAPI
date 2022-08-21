@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS AID_PACKAGE (
              PACKAGEID INT NOT NULL AUTO_INCREMENT,
              NAME VARCHAR (225) NOT NULL,
              `DESCRIPTION` VARCHAR (1500) NOT NULL,
+             `DATETIME`  DATETIME NOT NULL,
              `STATUS` ENUM('Draft', 'Published',
              	 'Awaiting Payment', 'Ordered', 'Shipped',
              	 'Received at MoH', 'Delivered'),
