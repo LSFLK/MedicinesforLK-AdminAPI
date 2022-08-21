@@ -83,7 +83,7 @@ type AidPackageUpdate record {
     int? packageUpdateID = ();
     int? packageID = ();
     string updateComment;
-    int? dateTime;
+    int dateTime?;
 };
 
 type Pledge record {
