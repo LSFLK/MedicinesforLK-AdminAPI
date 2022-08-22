@@ -65,6 +65,7 @@ type AidPackage record {
     decimal receivedAmount?;
     int dateTime?;
     AidPackageItem[] aidPackageItems = [];
+    string createdBy?;
 };
 
 type AidPackageItem record {

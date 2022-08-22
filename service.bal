@@ -75,7 +75,10 @@ service /admin on new http:Listener(9090) {
 
     # A resource for creating an Aid-Package
     # + return - An Aid-Package
-    resource function post aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
+    resource function post aidpackages(@http:Payload AidPackage aidPackage, @http:Header {name: "X-User-Name"} string createdBy) returns AidPackage|error {
+        if aidPackage?.createdBy is () {
+            aidPackage.createdBy = createdBy;
+        }
         int aidPackageid = check addAidPackage(aidPackage);
         aidPackage.packageID = aidPackageid;
         foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
