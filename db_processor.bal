@@ -303,9 +303,8 @@ function constructAidPAckageItem(int packageId, AidPackageItem aidPackageItem) r
 }
 
 function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
-    sql:ExecutionResult result = check dbClient->execute(`DELETE AID_PACKAGE_ITEM FROM AID_PACKAGE_ITEM INNER JOIN AID_PACKAGE ON
-    AID_PACKAGE_ITEM.PACKAGEID=AID_PACKAGE.PACKAGEID WHERE
-    AID_PACKAGE_ITEM.PACKAGEID=${packageId} AND PACKAGEITEMID=${packageItemId} AND (STATUS="Draft" OR STATUS="Published");`);
+    sql:ExecutionResult result = check dbClient->execute(`DELETE FROM AID_PACKAGE_ITEM WHERE PACKAGEITEMID=${packageItemId} 
+    AND PACKAGEID=${packageId};`);
     if result.affectedRowCount != 1 {
         AidPackage aidPackage = check getAidPackage(packageId);
         if aidPackage.status != "Draft" && aidPackage.status != "Published" {
