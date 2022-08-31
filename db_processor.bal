@@ -214,7 +214,7 @@ function getAidPackages(string? status) returns AidPackage[]|error {
     return aidPackages;
 }
 
-function addAidPackage(AidPackage aidPackage, string? createdBy) returns int|error {
+function addAidPackage(AidPackage aidPackage, string createdBy) returns int|error {
     int packageId = -1;
     int currentTime = getEpoch();
     sql:ExecutionResult result = check dbClient->execute(`INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS, DATETIME, DONORID, CREATEDBY)

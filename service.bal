@@ -1,5 +1,6 @@
 import ballerina/http;
 import ballerinax/mysql;
+import ballerina/lang.value;
 
 final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -76,15 +77,13 @@ service /admin on new http:Listener(9090) {
     # A resource for creating an Aid-Package
     # + return - An Aid-Package
     resource function post aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
-        Donor? donor = check getDonor(aidPackage.donorId);
-        int aidPackageid = check addAidPackage(aidPackage, donor?.displayName);
+        Donor donor = check value:ensureType(getDonor(aidPackage.donorId));
+        int aidPackageid = check addAidPackage(aidPackage, donor.displayName);
         aidPackage.packageID = aidPackageid;
         foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
             check constructAidPAckageItem(aidPackageid, aidPackageItem);
         }
-        if donor is Donor {
-            aidPackage.createdBy = donor.displayName;
-        }
+        aidPackage.createdBy = donor.displayName;
         return aidPackage;
     }
 
