@@ -192,7 +192,7 @@ function insertOrUpdatePledgeUpdate(PledgeUpdate pledgeUpdate) returns error? {
 }
 
 function getAidPackage(int packageId) returns AidPackage|error {
-    AidPackage aidPackage = check dbClient->queryRow(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS, UNIX_TIMESTAMP(DATETIME) as 'dateTime' FROM AID_PACKAGE
+    AidPackage aidPackage = check dbClient->queryRow(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS, UNIX_TIMESTAMP(DATETIME) as 'dateTime', DONORID, CREATEDBY as 'createdBy' FROM AID_PACKAGE
                                                           WHERE PACKAGEID=${packageId};`);
     return aidPackage;
 }
@@ -200,7 +200,7 @@ function getAidPackage(int packageId) returns AidPackage|error {
 //Aid Package
 function getAidPackages(string? status) returns AidPackage[]|error {
     AidPackage[] aidPackages = [];
-    sql:ParameterizedQuery query = `SELECT PACKAGEID, NAME, DESCRIPTION, STATUS, UNIX_TIMESTAMP(DATETIME) as 'dateTime' FROM AID_PACKAGE`;
+    sql:ParameterizedQuery query = `SELECT PACKAGEID, NAME, DESCRIPTION, STATUS, UNIX_TIMESTAMP(DATETIME) as 'dateTime', DONORID, CREATEDBY as 'createdBy' FROM AID_PACKAGE`;
     if (status is string) {
         query = sql:queryConcat(query, ` WHERE STATUS=${status}`);
     }
@@ -214,11 +214,11 @@ function getAidPackages(string? status) returns AidPackage[]|error {
     return aidPackages;
 }
 
-function addAidPackage(AidPackage aidPackage) returns int|error {
+function addAidPackage(AidPackage aidPackage, string createdBy) returns int|error {
     int packageId = -1;
     int currentTime = getEpoch();
-    sql:ExecutionResult result = check dbClient->execute(`INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS, DATETIME)
-                                        VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status}, FROM_UNIXTIME(${currentTime}));`);
+    sql:ExecutionResult result = check dbClient->execute(`INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS, DATETIME, DONORID, CREATEDBY)
+                                        VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status}, FROM_UNIXTIME(${currentTime}), ${aidPackage.donorId}, ${createdBy});`);
     var lastInsertedID = result.lastInsertId;
     if lastInsertedID is int {
         packageId = lastInsertedID;
