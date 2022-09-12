@@ -125,7 +125,6 @@ service /admin on new http:Listener(9090) {
                 if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem,false)) {
                     check insertOrUpdateAidPackageItem(aidPackageItem);
                     check updateMedicalNeedQuantity(aidPackageItem.needID);
-                    check updateQuotationRemainingQuantity(aidPackageItem);
                     aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
                     return aidPackageItem;
                 } else {
@@ -145,6 +144,7 @@ service /admin on new http:Listener(9090) {
     resource function delete aidpackages/[int packageID]() returns int|error {
         AidPackageItem[] aidPackageItems = check getAidPackageItems(packageID);
         foreach AidPackageItem aidPackageItem in aidPackageItems {
+            aidPackageItem.packageID = packageID;
             check deleteAidPackageItem(packageID, <int> aidPackageItem.packageItemID);
             check updateMedicalNeedQuantity(aidPackageItem.needID);
             check updateQuotationRemainingQuantity(aidPackageItem);
@@ -157,6 +157,7 @@ service /admin on new http:Listener(9090) {
     # + return - aidPackageItem
     resource function delete aidpackages/[int packageID]/aidpackageitems/[int packageItemID]() returns int|error {
         AidPackageItem aidPackageItem = check getAidPackageItem(packageItemID);
+        aidPackageItem.packageID = packageID;
         if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem, true)) {
             check deleteAidPackageItem(packageID, packageItemID);
             check updateMedicalNeedQuantity(aidPackageItem.needID);
