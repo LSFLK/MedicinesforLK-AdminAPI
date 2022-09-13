@@ -1,5 +1,6 @@
 import ballerina/http;
 import ballerinax/mysql;
+import ballerina/lang.value;
 
 final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -76,11 +77,13 @@ service /admin on new http:Listener(9090) {
     # A resource for creating an Aid-Package
     # + return - An Aid-Package
     resource function post aidpackages(@http:Payload AidPackage aidPackage) returns AidPackage|error {
-        int aidPackageid = check addAidPackage(aidPackage);
+        Donor donor = check value:ensureType(getDonor(aidPackage.donorId));
+        int aidPackageid = check addAidPackage(aidPackage, donor.displayName);
         aidPackage.packageID = aidPackageid;
         foreach AidPackageItem aidPackageItem in aidPackage.aidPackageItems {
             check constructAidPAckageItem(aidPackageid, aidPackageItem);
         }
+        aidPackage.createdBy = donor.displayName;
         return aidPackage;
     }
 
@@ -122,7 +125,6 @@ service /admin on new http:Listener(9090) {
                 if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem,false)) {
                     check insertOrUpdateAidPackageItem(aidPackageItem);
                     check updateMedicalNeedQuantity(aidPackageItem.needID);
-                    check updateQuotationRemainingQuantity(aidPackageItem);
                     aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
                     return aidPackageItem;
                 } else {
@@ -165,6 +167,7 @@ service /admin on new http:Listener(9090) {
     # + return - aidPackageItem
     resource function delete aidpackages/[int packageID]/aidpackageitems/[int packageItemID]() returns int|error {
         AidPackageItem aidPackageItem = check getAidPackageItem(packageItemID);
+        aidPackageItem.packageID = packageID;
         if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem, true)) {
             check deleteAidPackageItem(packageID, packageItemID);
             check updateMedicalNeedQuantity(aidPackageItem.needID);
