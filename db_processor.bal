@@ -422,7 +422,7 @@ function checkMedicalNeedQuantityAvailable(AidPackageItem aidPackageItem) return
 
 //Check Already Pledged against the Aid Package Item Update
 function checkAlreadyPledgedAgainstAidPackageUpdate(AidPackageItem aidPackageItem, boolean deleteItem) returns boolean|error {
-    decimal totalAmount = check dbClient->queryRow(`SELECT sum(TOTALAMOUNT) FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${aidPackageItem.packageID} AND PACKAGEITEMID!=${aidPackageItem.packageItemID};`);
+    decimal totalAmount = check dbClient->queryRow(`SELECT IFNULL(sum(TOTALAMOUNT), 0) FROM AID_PACKAGE_ITEM WHERE PACKAGEID=${aidPackageItem.packageID} AND PACKAGEITEMID!=${aidPackageItem.packageItemID};`);
     Quotation quotation = check getQuotation(aidPackageItem.quotationID);
     if !deleteItem {
         totalAmount += <decimal>aidPackageItem.quantity * quotation.unitPrice;
