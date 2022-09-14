@@ -168,7 +168,7 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
         }
         if (line.length() == 8) {
             var [_, _, urgency, period, beneficiary, itemName, unit, neededQuantity] = check readMedicalNeedsCSVLine(line, csvLineNo);
-            int|error itemID = retrieveMedicalItem(itemName, unit);
+            int|error itemID = createOrRetrieveMedicalItem(itemName, unit);
             if itemID is error {
                 errorMessages = errorMessages + string `Line:${csvLineNo}| Error occurred while inserting ${itemName} into MEDICAL_ITEM table`;
                 hasError = true;
@@ -202,7 +202,7 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
     return medicalNeeds;
 }
 
-function retrieveMedicalItem(string itemName, string unit) returns int|error {
+function createOrRetrieveMedicalItem(string itemName, string unit) returns int|error {
     int|error itemID = getMedicalItemId(itemName);
     if itemID is int {
         return itemID;
