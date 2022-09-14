@@ -167,19 +167,17 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
             continue; // Medical needs csv has empty line at the beginning, skipping it.
         }
         if (line.length() == 8) {
-            var [_, _, urgency, period, beneficiary, itemName, _, neededQuantity] = check readMedicalNeedsCSVLine(line, csvLineNo);
-            int|error itemID = getMedicalItemId(itemName);
-            if (itemID is error) {
-                errorMessages = errorMessages + string `Line:${csvLineNo}| ${itemName} is missing in MEDICAL_ITEM table 
-`;
+            var [_, _, urgency, period, beneficiary, itemName, unit, neededQuantity] = check readMedicalNeedsCSVLine(line, csvLineNo);
+            int|error itemID = retrieveMedicalItem(itemName, unit);
+            if itemID is error {
+                errorMessages = errorMessages + string `Line:${csvLineNo}| Error occurred while inserting ${itemName} into MEDICAL_ITEM table`;
                 hasError = true;
             } else {
                 medicalItemId = itemID;
             }
             int|error beneficiaryID = getBeneficiaryId(beneficiary);
             if (beneficiaryID is error) {
-                errorMessages = errorMessages + string `Line:${csvLineNo}| ${beneficiary} is missing in BENEFICIARY table 
-`;
+                errorMessages = errorMessages + string `Line:${csvLineNo}| ${beneficiary} is missing in BENEFICIARY table`;
                 hasError = true;
             } else {
                 medicalBeneficiaryId = beneficiaryID;
@@ -202,6 +200,15 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
         return error(errorMessages);
     }
     return medicalNeeds;
+}
+
+function retrieveMedicalItem(string itemName, string unit) returns int|error {
+    int|error itemID = getMedicalItemId(itemName);
+    if itemID is int {
+        return itemID;
+    }
+    // todo: identify how to extract item-type from the CSV
+    return addMedicalItemId(itemName, "Medicine", unit);
 }
 
 function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]|error {

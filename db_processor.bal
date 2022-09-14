@@ -31,6 +31,12 @@ function getMedicalItemId(string itemName) returns int|error {
     return check dbClient->queryRow(`SELECT ITEMID FROM MEDICAL_ITEM WHERE NAME=${itemName};`);
 }
 
+function addMedicalItemId(string itemName, string itemType, string unit) returns int|error {
+    sql:ExecutionResult result = check dbClient->execute(`INSERT INTO MEDICAL_ITEM(NAME, TYPE, UNIT)
+                                        VALUES (${itemName}, ${itemType}, ${unit});`);
+    return result.lastInsertId.ensureType();
+}
+
 //Beneficiary
 function getBeneficiary(int beneficiaryId) returns Beneficiary|error {
     return check dbClient->queryRow(`SELECT BENEFICIARYID, NAME, SHORTNAME, EMAIL, PHONENUMBER FROM BENEFICIARY 
