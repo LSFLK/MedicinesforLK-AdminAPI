@@ -52,7 +52,7 @@ function channelReadCsv(io:ReadableCSVChannel readableCSVChannel) returns string
     return results;
 }
 
-function readMedicalNeedsCSVLine(string[] line, int csvLineNo) returns [string, int, string, string, string, string, string, int]|error => [
+function readMedicalNeedsCSVLine(string[] line, int csvLineNo) returns [string, int, string, string, string, string, string, string, int]|error => [
     line[0],
     check readIntCSVField(line[1], csvLineNo),
     line[2],
@@ -60,7 +60,8 @@ function readMedicalNeedsCSVLine(string[] line, int csvLineNo) returns [string, 
     line[4],
     line[5],
     line[6],
-    check readIntCSVField(line[7], csvLineNo)
+    line[7],
+    check readIntCSVField(line[8], csvLineNo)
 ];
 
 function readSupplyQuotationsCSVLine(string[] line, int csvLineNo) returns [string, string, string, string, string, string, int, int, string, decimal]|error => [
@@ -166,9 +167,9 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
         if (csvLineNo == 1) {
             continue; // Medical needs csv has empty line at the beginning, skipping it.
         }
-        if (line.length() == 8) {
-            var [_, _, urgency, period, beneficiary, itemName, unit, neededQuantity] = check readMedicalNeedsCSVLine(line, csvLineNo);
-            int|error itemID = createOrRetrieveMedicalItem(itemName, unit);
+        if (line.length() == 9) {
+            var [_, _, urgency, period, beneficiary, itemName, itemType, unit, neededQuantity] = check readMedicalNeedsCSVLine(line, csvLineNo);
+            int|error itemID = createOrRetrieveMedicalItem(itemName, itemType, unit);
             if itemID is error {
                 errorMessages = errorMessages + string `Line:${csvLineNo}| Error occurred while inserting ${itemName} into MEDICAL_ITEM table`;
                 hasError = true;
@@ -202,13 +203,13 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
     return medicalNeeds;
 }
 
-function createOrRetrieveMedicalItem(string itemName, string unit) returns int|error {
+function createOrRetrieveMedicalItem(string itemName, string itemType, string unit) returns int|error {
     int|error itemID = getMedicalItemId(itemName);
     if itemID is int {
         return itemID;
     }
     // todo: identify how to extract item-type from the CSV
-    return addMedicalItemId(itemName, "Medicine", unit);
+    return addMedicalItemId(itemName, itemType, unit);
 }
 
 function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]|error {
