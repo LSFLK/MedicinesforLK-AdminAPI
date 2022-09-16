@@ -68,13 +68,13 @@ function readSupplyQuotationsCSVLine(string[] line, int csvLineNo) returns [stri
     line[0],
     line[1],
     line[2],
-    line[3],
-    line[4],
     line[5],
-    check readIntCSVField(line[6], csvLineNo),
-    check readIntCSVField(line[6], csvLineNo),
+    line[6],
     line[7],
-    check readDollerCSVField(line[8], csvLineNo)
+    check readIntCSVField(line[8], csvLineNo),
+    check readIntCSVField(line[8], csvLineNo),
+    line[9],
+    check readDollerCSVField(line[10], csvLineNo)
 ];
 
 function readIntCSVField(string value, int csvLineNo) returns int|error {
@@ -221,21 +221,19 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
         int medicalItemId = -1;
         int quotationSupplierId = -1;
         csvLineNo += 1;
-        if (line.length() == 9) {
+        if line.length() == 11 {
             var [_, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, remainingQuantity, expiryDate, unitPrice]
                 = check readSupplyQuotationsCSVLine(line, csvLineNo);
             int|error itemID = getMedicalItemId(itemNeeded);
             if (itemID is error) {
-                errorMessages = errorMessages + string `Line:${csvLineNo}| ${itemNeeded} is missing in MEDICAL_ITEM table
-`;
+                errorMessages = errorMessages + string `Line:${csvLineNo}| ${itemNeeded} is missing in MEDICAL_ITEM table`;
                 hasError = true;
             } else {
                 medicalItemId = itemID;
             }
             int|error supplierID = getSupplierId(supplier);
             if (supplierID is error) {
-                errorMessages = errorMessages + string `Line:${csvLineNo}| ${supplier} is missing in SUPPLIER table
-`;
+                errorMessages = errorMessages + string `Line:${csvLineNo}| ${supplier} is missing in SUPPLIER table`;
                 hasError = true;
             } else {
                 quotationSupplierId = supplierID;
