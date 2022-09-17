@@ -148,8 +148,8 @@ function getDateFromString(string dateString) returns time:Date|error {
     string[] dateParts = regex:split(dateString, "/");
     time:Date date = {
         year: check int:fromString(dateParts[2]),
-        month: check int:fromString(dateParts[0]),
-        day: check int:fromString(dateParts[1])
+        month: check int:fromString(dateParts[1]),
+        day: check int:fromString(dateParts[0])
     };
     return date;
 }
