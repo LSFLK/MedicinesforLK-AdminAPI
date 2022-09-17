@@ -192,7 +192,8 @@ function insertOrUpdatePledgeUpdate(PledgeUpdate pledgeUpdate) returns error? {
 }
 
 function getAidPackage(int packageId) returns AidPackage|error {
-    AidPackage aidPackage = check dbClient->queryRow(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS, UNIX_TIMESTAMP(DATETIME) as 'dateTime', DONORID, CREATEDBY as 'createdBy' FROM AID_PACKAGE
+    AidPackage aidPackage = check dbClient->queryRow(`SELECT PACKAGEID, NAME, DESCRIPTION, STATUS, UNIX_TIMESTAMP(DATETIME) as 'dateTime', DONORID,
+                                                          THUMBNAIL, BANNER, CREATEDBY as 'createdBy' FROM AID_PACKAGE
                                                           WHERE PACKAGEID=${packageId};`);
     return aidPackage;
 }
@@ -217,8 +218,9 @@ function getAidPackages(string? status) returns AidPackage[]|error {
 function addAidPackage(AidPackage aidPackage, string createdBy) returns int|error {
     int packageId = -1;
     int currentTime = getEpoch();
-    sql:ExecutionResult result = check dbClient->execute(`INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS, DATETIME, DONORID, CREATEDBY)
-                                        VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status}, FROM_UNIXTIME(${currentTime}), ${aidPackage.donorId}, ${createdBy});`);
+    sql:ExecutionResult result = check dbClient->execute(`INSERT INTO AID_PACKAGE(NAME, DESCRIPTION, STATUS, DATETIME, DONORID, CREATEDBY, THUMBNAIL, BANNER)
+                                        VALUES (${aidPackage.name}, ${aidPackage.description}, ${aidPackage.status}, FROM_UNIXTIME(${currentTime}), ${aidPackage.donorId}, ${createdBy},
+                                                ${aidPackage.thumbnail}, ${aidPackage.banner});`);
     var lastInsertedID = result.lastInsertId;
     if lastInsertedID is int {
         packageId = lastInsertedID;
@@ -230,7 +232,9 @@ function updateAidPackage(AidPackage aidPackage) returns error? {
     _ = check dbClient->execute(`UPDATE AID_PACKAGE SET
                                         NAME=COALESCE(${aidPackage.name},NAME), 
                                         DESCRIPTION=COALESCE(${aidPackage.description},DESCRIPTION),
-                                        STATUS=COALESCE(${aidPackage.status},STATUS)
+                                        STATUS=COALESCE(${aidPackage.status},STATUS),
+                                        THUMBNAIL=COALESCE(${aidPackage.thumbnail},THUMBNAIL),
+                                        BANNER=COALESCE(${aidPackage.banner},BANNER)
                                         WHERE PACKAGEID=${aidPackage.packageID};`);
 }
 
