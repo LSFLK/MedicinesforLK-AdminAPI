@@ -75,6 +75,10 @@ CREATE TABLE IF NOT EXISTS AID_PACKAGE (
              `STATUS` ENUM('Draft', 'Published',
              	 'Awaiting Payment', 'Ordered', 'Shipped',
              	 'Received at MoH', 'Delivered'),
+             `CREATEDBY` varchar(50) NOT NULL,
+             `DONORID` varchar(48) NOT NULL,
+             `THUMBNAIL` varchar(1048) DEFAULT NULL,
+             `BANNER` varchar(1048) DEFAULT NULL,
              PRIMARY KEY (PACKAGEID),
              UNIQUE(PACKAGEID)
 )ENGINE INNODB;
