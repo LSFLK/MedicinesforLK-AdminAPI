@@ -125,6 +125,7 @@ service /admin on new http:Listener(9090) {
                 if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem,false)) {
                     check insertOrUpdateAidPackageItem(aidPackageItem);
                     check updateMedicalNeedQuantity(aidPackageItem.needID);
+                    check updateQuotationRemainingQuantity(aidPackageItem);
                     aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
                     return aidPackageItem;
                 } else {

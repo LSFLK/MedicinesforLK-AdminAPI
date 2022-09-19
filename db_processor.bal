@@ -303,6 +303,7 @@ function constructAidPAckageItem(int packageId, AidPackageItem aidPackageItem) r
     aidPackageItem.totalAmount = <decimal>aidPackageItem.quantity * quotation.unitPrice;
     aidPackageItem.packageItemID = check addAidPackageItem(aidPackageItem);
     check updateMedicalNeedQuantity(aidPackageItem.needID);
+    check updateQuotationRemainingQuantity(aidPackageItem);
 }
 
 function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
@@ -438,15 +439,16 @@ function checkAlreadyPledgedAgainstAidPackageUpdate(AidPackageItem aidPackageIte
 
 //Update Medical Need Quantity
 function updateMedicalNeedQuantity(int needId) returns error? {
-    _ = check dbClient->execute(`UPDATE MEDICAL_NEED SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT SUM(QUANTITY) FROM 
-                     AID_PACKAGE_ITEM WHERE NEEDID=${needId}) WHERE NEEDID=${needId};`);
+    _ = check dbClient->execute(`UPDATE MEDICAL_NEED SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT IFNULL(SUM(QUANTITY) FROM 
+                     AID_PACKAGE_ITEM WHERE NEEDID=${needId}, 0)) WHERE NEEDID=${needId};`);
 }
 
 //Update Remaining Quantity in Quotation
 function updateQuotationRemainingQuantity(AidPackageItem aidPackageItem) returns error? {
     Quotation aidPackageItemQuotation = check getQuotation(aidPackageItem.quotationID);
-    _= check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=REMAININGQUANTITY+${aidPackageItem.quantity} 
-                                WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID};`);
+    _= check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=AVAILABLEQUANTITY-(SELECT IFNULL(SUM(QUANTITY) FROM 
+                    AID_PACKAGE_ITEM WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID}, 0)) 
+                    WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID};`);
 }
 
 function getReceivedAmount(int packageId) returns decimal|error {
