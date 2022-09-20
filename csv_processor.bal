@@ -52,7 +52,7 @@ function channelReadCsv(io:ReadableCSVChannel readableCSVChannel) returns string
     return results;
 }
 
-function readMedicalNeedsCSVLine(string[] line, int csvLineNo) returns [string, int, string, string, string, string, string, int]|error => [
+function readMedicalNeedsCSVLine(string[] line, int csvLineNo) returns [string, int, string, string, string, string, string, string, int]|error => [
     line[0],
     check readIntCSVField(line[1], csvLineNo),
     line[2],
@@ -60,20 +60,21 @@ function readMedicalNeedsCSVLine(string[] line, int csvLineNo) returns [string, 
     line[4],
     line[5],
     line[6],
-    check readIntCSVField(line[7], csvLineNo)
+    line[7],
+    check readIntCSVField(line[8], csvLineNo)
 ];
 
 function readSupplyQuotationsCSVLine(string[] line, int csvLineNo) returns [string, string, string, string, string, string, int, int, string, decimal]|error => [
     line[0],
     line[1],
     line[2],
-    line[3],
-    line[4],
     line[5],
-    check readIntCSVField(line[6], csvLineNo),
-    check readIntCSVField(line[6], csvLineNo),
+    line[6],
     line[7],
-    check readDollerCSVField(line[8], csvLineNo)
+    check readIntCSVField(line[8], csvLineNo),
+    check readIntCSVField(line[8], csvLineNo),
+    line[9],
+    check readDollerCSVField(line[10], csvLineNo)
 ];
 
 function readIntCSVField(string value, int csvLineNo) returns int|error {
@@ -166,20 +167,18 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
         if (csvLineNo == 1) {
             continue; // Medical needs csv has empty line at the beginning, skipping it.
         }
-        if (line.length() == 8) {
-            var [_, _, urgency, period, beneficiary, itemName, _, neededQuantity] = check readMedicalNeedsCSVLine(line, csvLineNo);
-            int|error itemID = getMedicalItemId(itemName);
-            if (itemID is error) {
-                errorMessages = errorMessages + string `Line:${csvLineNo}| ${itemName} is missing in MEDICAL_ITEM table 
-`;
+        if (line.length() == 9) {
+            var [_, _, urgency, period, beneficiary, itemName, itemType, unit, neededQuantity] = check readMedicalNeedsCSVLine(line, csvLineNo);
+            int|error itemID = createOrRetrieveMedicalItem(itemName, itemType, unit);
+            if itemID is error {
+                errorMessages = errorMessages + string `Line:${csvLineNo}| Error occurred while inserting ${itemName} into MEDICAL_ITEM table`;
                 hasError = true;
             } else {
                 medicalItemId = itemID;
             }
             int|error beneficiaryID = getBeneficiaryId(beneficiary);
             if (beneficiaryID is error) {
-                errorMessages = errorMessages + string `Line:${csvLineNo}| ${beneficiary} is missing in BENEFICIARY table 
-`;
+                errorMessages = errorMessages + string `Line:${csvLineNo}| ${beneficiary} is missing in BENEFICIARY table`;
                 hasError = true;
             } else {
                 medicalBeneficiaryId = beneficiaryID;
@@ -204,6 +203,15 @@ function createMedicalNeedsFromCSVData(string[][] inputCSVData) returns MedicalN
     return medicalNeeds;
 }
 
+function createOrRetrieveMedicalItem(string itemName, string itemType, string unit) returns int|error {
+    int|error itemID = getMedicalItemId(itemName);
+    if itemID is int {
+        return itemID;
+    }
+    // todo: identify how to extract item-type from the CSV
+    return addMedicalItemId(itemName, itemType, unit);
+}
+
 function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]|error {
     Quotation[] qutoations = [];
     string errorMessages = "";
@@ -213,21 +221,19 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
         int medicalItemId = -1;
         int quotationSupplierId = -1;
         csvLineNo += 1;
-        if (line.length() == 9) {
+        if line.length() == 11 {
             var [_, supplier, itemNeeded, regulatoryInfo, brandName, period, availableQuantity, remainingQuantity, expiryDate, unitPrice]
                 = check readSupplyQuotationsCSVLine(line, csvLineNo);
             int|error itemID = getMedicalItemId(itemNeeded);
             if (itemID is error) {
-                errorMessages = errorMessages + string `Line:${csvLineNo}| ${itemNeeded} is missing in MEDICAL_ITEM table
-`;
+                errorMessages = errorMessages + string `Line:${csvLineNo}| ${itemNeeded} is missing in MEDICAL_ITEM table`;
                 hasError = true;
             } else {
                 medicalItemId = itemID;
             }
             int|error supplierID = getSupplierId(supplier);
             if (supplierID is error) {
-                errorMessages = errorMessages + string `Line:${csvLineNo}| ${supplier} is missing in SUPPLIER table
-`;
+                errorMessages = errorMessages + string `Line:${csvLineNo}| ${supplier} is missing in SUPPLIER table`;
                 hasError = true;
             } else {
                 quotationSupplierId = supplierID;
