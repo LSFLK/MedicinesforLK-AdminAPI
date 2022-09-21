@@ -445,15 +445,15 @@ function checkAlreadyPledgedAgainstAidPackageUpdate(AidPackageItem aidPackageIte
 
 //Update Medical Need Quantity
 function updateMedicalNeedQuantity(int needId) returns error? {
-    _ = check dbClient->execute(`UPDATE MEDICAL_NEED SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT IFNULL(SUM(QUANTITY) FROM 
-                     AID_PACKAGE_ITEM WHERE NEEDID=${needId}, 0)) WHERE NEEDID=${needId};`);
+    _ = check dbClient->execute(`UPDATE MEDICAL_NEED SET REMAININGQUANTITY=NEEDEDQUANTITY-(SELECT IFNULL(SUM(QUANTITY), 0) FROM 
+                     AID_PACKAGE_ITEM WHERE NEEDID=${needId}) WHERE NEEDID=${needId};`);
 }
 
 //Update Remaining Quantity in Quotation
 function updateQuotationRemainingQuantity(AidPackageItem aidPackageItem) returns error? {
     Quotation aidPackageItemQuotation = check getQuotation(aidPackageItem.quotationID);
-    _= check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=AVAILABLEQUANTITY-(SELECT IFNULL(SUM(QUANTITY) FROM 
-                    AID_PACKAGE_ITEM WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID}, 0)) 
+    _= check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=AVAILABLEQUANTITY-(SELECT IFNULL(SUM(QUANTITY), 0) FROM 
+                    AID_PACKAGE_ITEM WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID}) 
                     WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID};`);
 }
 
