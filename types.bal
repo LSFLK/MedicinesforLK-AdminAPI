@@ -67,8 +67,8 @@ type AidPackage record {
     AidPackageItem[] aidPackageItems = [];
     string donorId;
     string createdBy?;
-    string thumbnail?;
-    string banner?;
+    string? thumbnail = ();
+    string? banner = ();
 };
 
 type AidPackageItem record {
