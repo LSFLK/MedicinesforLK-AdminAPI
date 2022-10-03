@@ -119,13 +119,37 @@ service /admin on new http:Listener(9090) {
     # + return - AidPackage-Item
     resource function put aidpackages/[int packageID]/aidpackageitems(@http:Payload AidPackageItem aidPackageItem)
                                                                     returns AidPackageItem|error {
+        string errorMessage = "";
         if (check checkPeriodNeedandQuotation(aidPackageItem.needID, aidPackageItem.quotationID)) {
             aidPackageItem.packageID = packageID;
             if (check checkMedicalNeedQuantityAvailable(aidPackageItem)) {
                 if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem,false)) {
-                    check insertOrUpdateAidPackageItem(aidPackageItem);
-                    check updateMedicalNeedQuantity(aidPackageItem.needID);
-                    check updateQuotationRemainingQuantity(aidPackageItem);
+                    transaction {
+                        error? res =  insertOrUpdateAidPackageItem(aidPackageItem);
+                        if (res is error) {
+                            errorMessage += generateTransactionErrorMessage(res, update);
+                        }
+
+                        res =  updateMedicalNeedQuantity(aidPackageItem.needID);
+                        if (res is error) {
+                            errorMessage += generateTransactionErrorMessage(res, update);
+                        }
+
+                        res =  updateQuotationRemainingQuantity(aidPackageItem);
+                        if (res is error) {
+                            errorMessage += generateTransactionErrorMessage(res, update);
+                        }
+
+                        if (errorMessage != "") {
+                            rollback;
+                            return error(errorMessage);
+                        } else {
+                            error? err = commit;
+                            if err is error {
+                                return error("Error occurred while committing update operaions of aid package item, ", err);
+                            }
+                        }
+                    }
                     aidPackageItem.quotation = check getQuotation(aidPackageItem.quotationID);
                     return aidPackageItem;
                 } else {
@@ -143,26 +167,78 @@ service /admin on new http:Listener(9090) {
     # A resource for removing an AidPackage
     # + return - aidPackageId
     resource function delete aidpackages/[int packageID]() returns int|error {
+        string errorMessage = "";
         AidPackageItem[] aidPackageItems = check getAidPackageItems(packageID);
-        foreach AidPackageItem aidPackageItem in aidPackageItems {
-            aidPackageItem.packageID = packageID;
-            check deleteAidPackageItem(packageID, <int> aidPackageItem.packageItemID);
-            check updateMedicalNeedQuantity(aidPackageItem.needID);
-            check updateQuotationRemainingQuantity(aidPackageItem);
+        transaction {
+            foreach AidPackageItem aidPackageItem in aidPackageItems {
+                aidPackageItem.packageID = packageID;
+                    error? res = deleteAidPackageItem(packageID, <int> aidPackageItem.packageItemID);
+                    if (res is error) {
+                        errorMessage += generateTransactionErrorMessage(res, delete);
+                    }
+
+                    res = updateMedicalNeedQuantity(aidPackageItem.needID);
+                    if (res is error) {
+                        errorMessage += generateTransactionErrorMessage(res, update);
+                    }
+
+                    res = updateQuotationRemainingQuantity(aidPackageItem);
+                    if (res is error) {
+                        errorMessage += generateTransactionErrorMessage(res, update);
+                    }
+            }
+
+            error? deleteAidPackageResult = deleteAidPackage(packageID);
+            if (deleteAidPackageResult is error) {
+                errorMessage += generateTransactionErrorMessage(deleteAidPackageResult, delete);
+            }
+
+            if (errorMessage != "") {
+                rollback;
+                return error(errorMessage);
+            } else {
+                error? err = commit;
+                if err is error {
+                    return error("Error occurred while committing delete operation of aid package, ", err);
+                }
+            }  
         }
-        check deleteAidPackage(packageID);
         return packageID;
     }
 
     # A resource for removing an AidPackage-Item
     # + return - aidPackageItem
     resource function delete aidpackages/[int packageID]/aidpackageitems/[int packageItemID]() returns int|error {
+        string errorMessage = "";
         AidPackageItem aidPackageItem = check getAidPackageItem(packageItemID);
         aidPackageItem.packageID = packageID;
         if (check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem, true)) {
-            check deleteAidPackageItem(packageID, packageItemID);
-            check updateMedicalNeedQuantity(aidPackageItem.needID);
-            check updateQuotationRemainingQuantity(aidPackageItem);
+            transaction {
+                error? res =  deleteAidPackageItem(packageID, packageItemID);
+                if (res is error) {
+                    errorMessage += generateTransactionErrorMessage(res, delete);
+                }
+
+                res = updateMedicalNeedQuantity(aidPackageItem.needID);
+                if (res is error) {
+                    errorMessage += generateTransactionErrorMessage(res, update);
+                }
+
+                res = updateQuotationRemainingQuantity(aidPackageItem);
+                if (res is error) {
+                    errorMessage += generateTransactionErrorMessage(res, update);
+                } 
+
+                if (errorMessage != "") {
+                    rollback;
+                    return error(errorMessage);
+                } else {
+                    error? err = commit;
+                    if err is error {
+                        return error("Error occurred while committing delete operation of aid package item, ", err);
+                    }
+                } 
+            }
         } else {
             return error("Already done Pledges amount exceeds the Aid Package Item Quantitiy Update");
         }
