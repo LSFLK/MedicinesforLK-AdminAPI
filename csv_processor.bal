@@ -208,7 +208,6 @@ function createOrRetrieveMedicalItem(string itemName, string itemType, string un
     if itemID is int {
         return itemID;
     }
-    // todo: identify how to extract item-type from the CSV
     return addMedicalItemId(itemName, itemType, unit);
 }
 
@@ -261,4 +260,59 @@ function createQuotationFromCSVData(string[][] inputCSVData) returns Quotation[]
         return error(errorMessages);
     }
     return qutoations;
+}
+
+isolated function createSupplierFromCSVData(string[][] inputCsv) returns Supplier[]|error {
+    Supplier[] suppliers = [];
+    string[] errors = [];
+    foreach [int, string[]] [idx, line] in inputCsv.enumerate() {
+        int csvLineNo = idx + 1;
+        if line.length() != 4 {
+            return error(string `Invalid CSV Length in line:${csvLineNo}`);
+        }
+        var [name, shortName, email, phoneNumber] = readSupplierCsvLine(line);
+        boolean hasErrors = false;
+        if !isValidEmail(email) {
+            errors.push(string `Line:${csvLineNo}| provided email [${email}] is invalid`);
+            hasErrors = true;
+        }
+        if !isValidPhoneNumber(phoneNumber) {
+            errors.push(string `Line:${csvLineNo}| provided phone number [${phoneNumber}] is invalid`);
+            hasErrors = true;
+        }
+        if !hasErrors {
+            Supplier supplier = {
+                name: name,
+                shortName: shortName,
+                email: email,
+                phoneNumber: phoneNumber
+            };
+            suppliers.push(supplier);
+        }
+    }
+    if errors.length() > 0 {
+        string errorMsg = string:'join(" ", ...errors);
+        return error (errorMsg);
+    }
+    return suppliers;
+}
+
+isolated function readSupplierCsvLine(string[] line) returns [string, string, string, string] => [
+    line[0],
+    line[1],
+    line[2],
+    line[3]
+];
+
+final string emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
+
+isolated function isValidEmail(string email) returns boolean {
+    return regex:matches(email, emailRegex);
+}
+
+// todo: update phone-number regex properly
+final string phoneNumberRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
+
+isolated function isValidPhoneNumber(string phoneNumber) returns boolean {
+    return regex:matches(phoneNumber, phoneNumberRegex);
 }

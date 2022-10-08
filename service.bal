@@ -287,4 +287,15 @@ service /admin on new http:Listener(9090) {
             return e;
         }
     }
+
+    # Resource for upload supplier list.
+    #
+    # + request - `http:Request` with file payoad
+    # + return - Return the status of the action or `error`
+    resource function post suppliers(http:Request request) returns string|error {
+        string[][] csvLines = check handleCSVBodyParts(request);
+        Supplier[] suppliers = check createSupplierFromCSVData(csvLines);
+        string status = check addSuppliers(suppliers);
+        return string `CSV File uploaded successfully!${"\n"} ${status}`;
+    }
 }
