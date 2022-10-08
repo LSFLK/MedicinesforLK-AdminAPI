@@ -503,7 +503,7 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
 function updateMedicalNeedsLastUpdateTime(int lastUpdatedTime) returns error? {
     int currentTime = getEpoch();
     sql:ParameterizedQuery query = `INSERT INTO MEDICAL_NEED_UPDATE(DATETIME, LAST_UPDATED_TIME) 
-        VALUES (FROM_UNIXTIME(${currentTime}), FROM_UNIXTIME(${lastUpdatedTime})`;
+        VALUES (FROM_UNIXTIME(${currentTime}), FROM_UNIXTIME(${lastUpdatedTime}))`;
     _ = check dbClient->execute(query);    
 }
 
