@@ -500,6 +500,13 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
     return status;
 }
 
+function updateMedicalNeedsLastUpdateTime(int lastUpdatedTime) returns error? {
+    int currentTime = getEpoch();
+    sql:ParameterizedQuery query = `INSERT INTO MEDICAL_NEED_UPDATE(DATETIME, LAST_UPDATED_TIME) 
+        VALUES (FROM_UNIXTIME(${currentTime}), FROM_UNIXTIME(${lastUpdatedTime})`;
+    _ = check dbClient->execute(query);    
+}
+
 function updateQuotationsTable(Quotation[] quotations) returns string|error {
     string statusMessageList = "";
     Quotation[] quotationsRequireUpdate = [];

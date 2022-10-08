@@ -1,6 +1,7 @@
 import ballerina/http;
 import ballerinax/mysql;
 import ballerina/lang.value;
+import ballerina/time;
 
 final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
 
@@ -257,12 +258,13 @@ service /admin on new http:Listener(9090) {
     #
     # + request - http:Request with the file payload
     # + return - Return http:Response or an error
-    resource function post requirements/medicalneeds(http:Request request) returns http:Response|error {
+    resource function post requirements/medicalneeds(int updatedTime, http:Request request) returns http:Response|error {
         do {
             http:Response response = new;
             string[][] csvLines = check handleCSVBodyParts(request);
             MedicalNeed[] medicalNeeds = check createMedicalNeedsFromCSVData(csvLines);
             string status = check updateMedicalNeedsTable(medicalNeeds);
+            _ = check updateMedicalNeedsLastUpdateTime(updatedTime);
             response.setPayload("CSV File uploaded successfully!\n" + status);
             return response;
         } on fail var e {
