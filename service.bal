@@ -1,7 +1,6 @@
 import ballerina/http;
 import ballerinax/mysql;
 import ballerina/lang.value;
-import ballerina/time;
 
 final mysql:Client dbClient = check new (dbHost, dbUser, dbPass, db, dbPort);
 
