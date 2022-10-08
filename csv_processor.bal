@@ -276,6 +276,7 @@ isolated function createSupplierFromCSVData(string[][] inputCsv) returns Supplie
             errors.push(string `Line:${csvLineNo}| provided email [${email}] is invalid`);
             hasErrors = true;
         }
+        phoneNumber = regex:replaceAll(phoneNumber, "\\s+", "");
         if !isValidPhoneNumber(phoneNumber) {
             errors.push(string `Line:${csvLineNo}| provided phone number [${phoneNumber}] is invalid`);
             hasErrors = true;
@@ -310,8 +311,7 @@ isolated function isValidEmail(string email) returns boolean {
     return regex:matches(email, emailRegex);
 }
 
-// todo: update phone-number regex properly
-final string phoneNumberRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
+final string phoneNumberRegex = "\\+[1-9]{1}[0-9]{3,14}";
 
 isolated function isValidPhoneNumber(string phoneNumber) returns boolean {
     return regex:matches(phoneNumber, phoneNumberRegex);
