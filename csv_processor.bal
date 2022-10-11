@@ -292,18 +292,13 @@ isolated function createSupplierFromCSVData(string[][] inputCsv) returns Supplie
         }
     }
     if errors.length() > 0 {
-        string errorMsg = string:'join(" ", ...errors);
+        string errorMsg = string:'join(",", ...errors);
         return error (errorMsg);
     }
     return suppliers;
 }
 
-isolated function readSupplierCsvLine(string[] line) returns [string, string, string, string] => [
-    line[0],
-    line[1],
-    line[2],
-    line[3]
-];
+isolated function readSupplierCsvLine(string[] line) returns string[4] => <string[4]>line;
 
 final string emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
 
