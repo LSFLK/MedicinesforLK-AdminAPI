@@ -533,7 +533,8 @@ function updateQuotationsTable(Quotation[] quotations) returns string|error {
     sql:ParameterizedQuery[] updateQueries =
         from var data in quotationsRequireUpdate
     select `UPDATE QUOTATION 
-                SET AVAILABLEQUANTITY = ${data.availableQuantity},
+                SET REMAININGQUANTITY = greatest(REMAININGQUANTITY - AVAILABLEQUANTITY + ${data.availableQuantity}, 0),
+                AVAILABLEQUANTITY = ${data.availableQuantity},
                 EXPIRYDATE = ${data.expiryDate},
                 UNITPRICE = ${data.unitPrice}, 
                 REGULATORYINFO = ${data.regulatoryInfo}
