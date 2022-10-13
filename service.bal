@@ -144,14 +144,24 @@ service /admin on new http:Listener(9090) {
     # + return - aidPackageId
     resource function delete aidpackages/[int packageID]() returns int|error {
         AidPackageItem[] aidPackageItems = check getAidPackageItems(packageID);
+        boolean checkAlreadyPledged = true;
         foreach AidPackageItem aidPackageItem in aidPackageItems {
-            aidPackageItem.packageID = packageID;
-            check deleteAidPackageItem(packageID, <int> aidPackageItem.packageItemID);
-            check updateMedicalNeedQuantity(aidPackageItem.needID);
-            check updateQuotationRemainingQuantity(aidPackageItem);
+            if (!check checkAlreadyPledgedAgainstAidPackageUpdate(aidPackageItem, true)) {
+                checkAlreadyPledged = false;
+                break;
+            }
         }
-        check deleteAidPackage(packageID);
-        return packageID;
+        if (checkAlreadyPledged) {
+            foreach AidPackageItem aidPackageItem in aidPackageItems {
+                check deleteAidPackageItem(packageID, <int> aidPackageItem.packageItemID);
+                check updateMedicalNeedQuantity(aidPackageItem.needID);
+                check updateQuotationRemainingQuantity(aidPackageItem);
+            }
+            check deleteAidPackage(packageID);
+            return packageID;
+        } else {
+            return error("Already done Pledges amount exceeds the Aid Package Item Quantitiy Update for some items in the Aid Package");
+        }  
     }
 
     # A resource for removing an AidPackage-Item
