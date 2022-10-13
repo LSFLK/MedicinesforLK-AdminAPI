@@ -298,7 +298,7 @@ isolated function createSupplierFromCSVData(string[][] inputCsv) returns Supplie
     return suppliers;
 }
 
-isolated function readSupplierCsvLine(string[] line) returns string[4] => <string[4]>line;
+isolated function readSupplierCsvLine(string[] line) returns string[4] => [line[0], line[1], line[2], line[3]];
 
 final string emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
 
