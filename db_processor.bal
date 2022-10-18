@@ -546,6 +546,13 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
     return status;
 }
 
+function updateMedicalNeedsLastUpdateTime(int lastUpdatedTime) returns error? {
+    int currentTime = getEpoch();
+    sql:ParameterizedQuery query = `INSERT INTO MEDICAL_NEED_UPDATE(DATETIME, LAST_UPDATED_TIME) 
+        VALUES (FROM_UNIXTIME(${currentTime}), FROM_UNIXTIME(${lastUpdatedTime}))`;
+    _ = check dbClient->execute(query);    
+}
+
 function updateQuotationsTable(Quotation[] quotations) returns string|error {
     string statusMessageList = "";
     Quotation[] quotationsRequireUpdate = [];
@@ -572,7 +579,8 @@ function updateQuotationsTable(Quotation[] quotations) returns string|error {
     sql:ParameterizedQuery[] updateQueries =
         from var data in quotationsRequireUpdate
     select `UPDATE QUOTATION 
-                SET AVAILABLEQUANTITY = ${data.availableQuantity},
+                SET REMAININGQUANTITY = greatest(REMAININGQUANTITY - AVAILABLEQUANTITY + ${data.availableQuantity}, 0),
+                AVAILABLEQUANTITY = ${data.availableQuantity},
                 EXPIRYDATE = ${data.expiryDate},
                 UNITPRICE = ${data.unitPrice}, 
                 REGULATORYINFO = ${data.regulatoryInfo}
@@ -581,6 +589,44 @@ function updateQuotationsTable(Quotation[] quotations) returns string|error {
     statusMessageList = statusMessageList + ret;
     log:printInfo(statusMessageList);
     return status;
+}
+
+function addSuppliers(Supplier[] suppliers) returns string|error {
+    string[] statusMessages = [];
+    Supplier[] newSuppliers = [];
+    Supplier[] suppliersRequireUpdate = [];
+    foreach Supplier supplier in suppliers {
+        if isSupplierAvailable(supplier.name) {
+            suppliersRequireUpdate.push(supplier);
+        } else {
+            newSuppliers.push(supplier);
+        }
+    }
+    statusMessages.push(string `Total Suppliers count in file:${suppliers.length()}, Suppliers require update:${suppliersRequireUpdate.length()}, New Suppliers:${newSuppliers.length()}`);
+    sql:ParameterizedQuery[] insertQueries =
+        from Supplier data in newSuppliers
+    select `INSERT INTO SUPPLIER 
+                (NAME, SHORTNAME, EMAIL, PHONENUMBER) 
+                VALUES (${data.name}, ${data.shortName},${data.email}, ${data.phoneNumber})`;
+
+    sql:ParameterizedQuery[] updateQueries =
+        from Supplier data in suppliersRequireUpdate
+    select `UPDATE SUPPLIER 
+                SET SHORTNAME = ${data.shortName},
+                EMAIL = ${data.email},
+                PHONENUMBER = ${data.phoneNumber}
+                WHERE NAME = ${data.name}`;
+    string ret = check updateDataInTransaction(insertQueries, updateQueries);
+    statusMessages.push(ret);
+    string status = string:'join("\n", ...statusMessages);
+    log:printInfo(status);
+    return status;
+}
+
+function isSupplierAvailable(string supplierName) returns boolean {
+    int|error supplierId = dbClient->queryRow(`SELECT SUPPLIERID FROM SUPPLIER 
+                                    WHERE NAME=${supplierName}`);
+    return supplierId is int;
 }
 
 function updateDataInTransaction(sql:ParameterizedQuery[] insertQueries, sql:ParameterizedQuery[] updateQueries, 
