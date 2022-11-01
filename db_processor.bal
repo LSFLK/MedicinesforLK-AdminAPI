@@ -4,6 +4,12 @@ import ballerina/log;
 
 const TIME_ZONE = "Asia/Colombo";
 
+enum TransactionExecutionType {
+   delete,
+   update,
+   insert
+}
+
 //Medical Needs
 function getMedicalNeeds() returns MedicalNeed[]|error {
     MedicalNeed[] medicalNeeds = [];
@@ -154,8 +160,29 @@ function updatePledge(string status, int pledgeId) returns Pledge|error {
 }
 
 function deletePledge(int pledgeId) returns error? {
-    _ = check dbClient->execute(`DELETE FROM PLEDGE_UPDATE WHERE PLEDGEID=${pledgeId}`);
-    _ = check dbClient->execute(`DELETE FROM PLEDGE WHERE PLEDGEID=${pledgeId};`);
+    string message = "";
+    transaction {
+        sql:ExecutionResult|sql:Error res = dbClient->execute(
+            `DELETE FROM PLEDGE_UPDATE WHERE PLEDGEID=${pledgeId}`);
+        if (res is sql:Error) {
+            message += generateTransactionErrorMessage(res, delete);
+        }
+
+        res = dbClient->execute(
+            `DELETE FROM PLEDGE WHERE PLEDGEID=${pledgeId};`);
+        if (res is sql:Error) {
+            message += generateTransactionErrorMessage(res, delete);
+        }
+        if (message != "") {
+            rollback;
+            return error(message);
+        } else {
+            error? err = commit;
+            if err is error {
+                return error("Error occurred while committing delete operaions of pledge item, ", err);
+            }
+        }
+    }
 }
 
 //Pledge update
@@ -303,13 +330,32 @@ function addAidPackageItem(AidPackageItem aidPackageItem) returns int|error {
 }
 
 function constructAidPAckageItem(int packageId, AidPackageItem aidPackageItem) returns error? {
+    string errorMessage = "";
     Quotation quotation = check getQuotation(aidPackageItem.quotationID);
     aidPackageItem.quotation = quotation;
     aidPackageItem.packageID = packageId;
     aidPackageItem.totalAmount = <decimal>aidPackageItem.quantity * quotation.unitPrice;
     aidPackageItem.packageItemID = check addAidPackageItem(aidPackageItem);
-    check updateMedicalNeedQuantity(aidPackageItem.needID);
-    check updateQuotationRemainingQuantity(aidPackageItem);
+    transaction {
+        error? res =  updateMedicalNeedQuantity(aidPackageItem.needID);
+        if (res is error) {
+            errorMessage += generateTransactionErrorMessage(res, update);
+        }
+
+        res = updateQuotationRemainingQuantity(aidPackageItem);
+        if (res is error) {
+            errorMessage += generateTransactionErrorMessage(res, update);
+        }
+        if (errorMessage != "") {
+            rollback;
+            return error(errorMessage);
+        } else {
+            error? err = commit;
+            if err is error {
+                return error("Error occurred while committing aid package item, ", err);
+            }
+        }
+    }
 }
 
 function deleteAidPackageItem(int packageId, int packageItemId) returns error? {
@@ -452,7 +498,7 @@ function updateMedicalNeedQuantity(int needId) returns error? {
 //Update Remaining Quantity in Quotation
 function updateQuotationRemainingQuantity(AidPackageItem aidPackageItem) returns error? {
     Quotation aidPackageItemQuotation = check getQuotation(aidPackageItem.quotationID);
-    _= check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=AVAILABLEQUANTITY-(SELECT IFNULL(SUM(QUANTITY), 0) FROM 
+    _ = check dbClient->execute(`UPDATE QUOTATION SET REMAININGQUANTITY=AVAILABLEQUANTITY-(SELECT IFNULL(SUM(QUANTITY), 0) FROM 
                     AID_PACKAGE_ITEM WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID}) 
                     WHERE QUOTATIONID=${aidPackageItemQuotation.quotationID};`);
 }
@@ -494,7 +540,7 @@ function updateMedicalNeedsTable(MedicalNeed[] medicalNeeds) returns string|erro
                     REMAININGQUANTITY = ${data.neededQuantity} ,
                     URGENCY = ${data.urgency} 
                     WHERE ITEMID = ${data.itemID} AND BENEFICIARYID = ${data.beneficiaryID} AND PERIOD = ${data.period}`;
-    string ret = check updateDataInTransaction(insertQueries, updateQueries);
+    string ret = check updateDataInTransaction(insertQueries, updateQueries, "MEDICAL_NEED");
     statusMessageList = statusMessageList + ret;
     log:printInfo(statusMessageList);
     return status;
@@ -539,7 +585,7 @@ function updateQuotationsTable(Quotation[] quotations) returns string|error {
                 UNITPRICE = ${data.unitPrice}, 
                 REGULATORYINFO = ${data.regulatoryInfo}
                 WHERE ITEMID = ${data.itemID} AND SUPPLIERID = ${data.supplierID} AND PERIOD = ${data.period}`;
-    string ret = check updateDataInTransaction(insertQueries, updateQueries);
+    string ret = check updateDataInTransaction(insertQueries, updateQueries, "QUOTATION");
     statusMessageList = statusMessageList + ret;
     log:printInfo(statusMessageList);
     return status;
@@ -583,7 +629,8 @@ function isSupplierAvailable(string supplierName) returns boolean {
     return supplierId is int;
 }
 
-function updateDataInTransaction(sql:ParameterizedQuery[] insertQueries, sql:ParameterizedQuery[] updateQueries) returns string|error {
+function updateDataInTransaction(sql:ParameterizedQuery[] insertQueries, sql:ParameterizedQuery[] updateQueries, 
+        string dbTable) returns string|error {
     string status = "";
     transaction {
         sql:ExecutionResult[]|error insertResult = [];
@@ -596,12 +643,19 @@ function updateDataInTransaction(sql:ParameterizedQuery[] insertQueries, sql:Par
         }
         if insertResult is error || updateResult is error {
             rollback;
-            return error(generateTransactionErrorMessage(insertResult, updateResult));
-
+            string errorMessage = "";
+            if insertResult is error {
+                errorMessage += generateTransactionErrorMessage(insertResult, insert);
+            } 
+            
+            if updateResult is error {
+                errorMessage += generateTransactionErrorMessage(updateResult, update);
+            }
+            return error(errorMessage);
         } else {
             error? err = commit;
             if err is error {
-                return error("Error occurred while committing");
+                return error(string `Error occurred while committing update operations in '${dbTable}'`, err);
             }
             int totalInsertAffectedRowCount = calculateAffectedRowCountByBatchUpdate(insertResult);
             int totalUpdateAffectedRowCount = calculateAffectedRowCountByBatchUpdate(updateResult);
@@ -622,18 +676,9 @@ function calculateAffectedRowCountByBatchUpdate(sql:ExecutionResult[]|error batc
     return totalAffectedCount;
 }
 
-function generateTransactionErrorMessage(sql:ExecutionResult[]|error insertResult,
-        sql:ExecutionResult[]|error updateResult) returns string {
-
-    string message = "Data upload transaction failed,";
-    if (insertResult is sql:BatchExecuteError) {
-        message = message + " with insert batch error! \n ";
-        log:printError("Upload transaction failed:", insertResult);
-    }
-    if (updateResult is sql:BatchExecuteError) {
-        message = message + " with update batch error! \n ";
-        log:printError("Upload transaction failed:", updateResult);
-    }
+function generateTransactionErrorMessage(error e, TransactionExecutionType executionType) returns string {
+    string message = string`Transaction failed with ${executionType} operation error! ${"\n"}`;
+    log:printError(message, e);
     return message;
 }
 
