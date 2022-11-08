@@ -616,7 +616,7 @@ function addSuppliers(Supplier[] suppliers) returns string|error {
                 EMAIL = ${data.email},
                 PHONENUMBER = ${data.phoneNumber}
                 WHERE NAME = ${data.name}`;
-    string ret = check updateDataInTransaction(insertQueries, updateQueries);
+    string ret = check updateDataInTransaction(insertQueries, updateQueries, "SUPPLIER");
     statusMessages.push(ret);
     string status = string:'join("\n", ...statusMessages);
     log:printInfo(status);
