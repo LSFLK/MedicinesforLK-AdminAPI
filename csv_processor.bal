@@ -14,7 +14,7 @@ function handleCSVBodyParts(http:Request request) returns string[][]|error {
                 string baseType = mediaType.getBaseType();
                 if ("text/csv" == baseType) {
                     byte[] payload = check bodyPart.getByteArray();
-                    csvLines = check getCSVData(payload);
+                    csvLines.push(...(check getCSVData(payload)));
                 } else {
                     return error("Invalid base type, not text/csv");
                 }
